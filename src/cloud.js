@@ -9,9 +9,9 @@
 //   ・ログインしない人のために、端末内だけの保存も用意する
 // ============================================================
 
-const TOK = "yongoutou:token";     // ログインの券
-const LOCAL = "yongoutou:local";   // この端末だけの記録
-const LASTID = "yongoutou:lastid"; // 前回の名前（入力欄の初期値に使う）
+const TOK = "shikyou:token";     // ログインの券
+const LOCAL = "shikyou:local";   // この端末だけの記録
+const LASTID = "shikyou:lastid"; // 前回の名前（入力欄の初期値に使う）
 
 function ls(fn, fallback) {
   try { return fn(); } catch (e) { return fallback; }

@@ -1,7 +1,7 @@
 {
-  "name": "四号棟",
-  "short_name": "四号棟",
-  "description": "常盤台団地・解体前夜。懐中電灯ひとつで五階まで上る一人称ホラー。",
+  "name": "死鏡団地",
+  "short_name": "死鏡団地",
+  "description": "死鏡団地 四号棟・解体前夜。懐中電灯ひとつで五階まで上る一人称ホラー。",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
@@ -9,8 +9,36 @@
   "background_color": "#04050a",
   "theme_color": "#05060a",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/favicon.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

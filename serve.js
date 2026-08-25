@@ -88,4 +88,4 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream", "cache-control": "no-store" });
     res.end(data);
   });
-}).listen(PORT, "127.0.0.1", () => console.log("四号棟  http://localhost:" + PORT));
+}).listen(PORT, "127.0.0.1", () => console.log("死鏡団地  http://localhost:" + PORT));

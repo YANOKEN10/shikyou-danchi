@@ -9,16 +9,16 @@
 const crypto = require("crypto");
 const S = require("./_store");
 
-const SECRET = process.env.AUTH_SECRET || (process.env.VERCEL ? "" : "yongoutou-local-dev-secret-0000");
+const SECRET = process.env.AUTH_SECRET || (process.env.VERCEL ? "" : "shikyou-danchi-local-dev-secret-0000");
 const YEAR = 1000 * 60 * 60 * 24 * 365;
 
 const ORIGINS = [
-  "https://yongoutou.vercel.app",
+  "https://shikyou-danchi.vercel.app",
   "https://yanoken10.github.io",
   "http://localhost:5180",
   "http://127.0.0.1:5180",
 ];
-const PREVIEW = /^https:\/\/yongoutou-[a-z0-9-]+\.vercel\.app$/;
+const PREVIEW = /^https:\/\/shikyou-danchi-[a-z0-9-]+\.vercel\.app$/;
 
 function configured() { return S.storeReady() && SECRET.length >= 16; }
 
@@ -50,10 +50,10 @@ function normMail(v) { return String(v == null ? "" : v).normalize("NFKC").trim(
 function isMail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normMail(v)); }
 
 function userKey(id) {
-  return "yg/u/" + crypto.createHash("sha256").update("ygt1:" + id).digest("hex") + ".json";
+  return "sk/u/" + crypto.createHash("sha256").update("skd1:" + id).digest("hex") + ".json";
 }
 function mailKey(mail) {
-  return "yg/e/" + crypto.createHash("sha256").update("ygmail1:" + mail).digest("hex") + ".json";
+  return "sk/e/" + crypto.createHash("sha256").update("skmail1:" + mail).digest("hex") + ".json";
 }
 
 async function readUser(id) { return S.readJson(userKey(id)); }

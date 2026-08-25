@@ -1,9 +1,9 @@
-# 四号棟
+# 死鏡団地
 
-常盤台団地・解体前夜。取り壊し直前の団地に、母のノートを取りに戻る一人称ホラー。
+四号棟・解体前夜。取り壊し直前の団地に、母のノートを取りに戻る一人称ホラー。
 ブラウザだけで遊べます。インストールもプラグインも要りません。
 
-**公開URL**（デプロイ後）: <https://yongoutou.vercel.app>
+**公開URL**（デプロイ後）: <https://shikyou-danchi.vercel.app>
 
 - 画像ファイル・音声ファイルは 1 つも使っていません。
   形も、汚れも、効果音も、すべてその場で作っています（Three.js ＋ WebAudio）。
@@ -82,7 +82,7 @@ Claude を経由しません。公開URLを開けば、そこがそのままゲ�
 ## 手元で動かす
 
 ```bash
-node "I:/Claude code/yongoutou/serve.js"
+node "I:/Claude code/shikyou-danchi/serve.js"
 ```
 
 <http://localhost:5180> を開いてください。
@@ -96,13 +96,13 @@ node "I:/Claude code/yongoutou/serve.js"
 
 ### 1. 記録の保管庫（Blob ストア）をつなぐ
 
-1. <https://vercel.com/dashboard> → プロジェクト **yongoutou** を開く
+1. <https://vercel.com/dashboard> → プロジェクト **shikyou-danchi** を開く
 2. **Storage** → **Create Database** →  **Blob**（既存のストアの **Connect** でも可）
-3. **Connect to Project** で `yongoutou` を選び、環境は **すべて** にチェック
+3. **Connect to Project** で `shikyou-danchi` を選び、環境は **すべて** にチェック
 
 これで `BLOB_READ_WRITE_TOKEN` が自動で設定されます。
 ボンバーマンや廃校おばけで作ったストアを使い回しても構いません（その場合も Connect は必要です）。
-記録のファイル名は `yg/` で始まるので、他のゲームと混ざりません。
+記録のファイル名は `sk/` で始まるので、他のゲームと混ざりません。
 
 ### 2. 署名用の合言葉を足す
 
@@ -116,7 +116,7 @@ node "I:/Claude code/yongoutou/serve.js"
 
 ### 3. 確かめる
 
-<https://yongoutou.vercel.app/api/health> を開くと、こう出れば準備完了です。
+<https://shikyou-danchi.vercel.app/api/health> を開くと、こう出れば準備完了です。
 
 ```json
 { "ok": true, "store": "blob", "hasBlobToken": true, "hasAuthSecret": true, "configured": true }

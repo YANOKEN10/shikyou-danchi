@@ -1,8 +1,8 @@
 {
-  "name": "yongoutou",
+  "name": "shikyou-danchi",
   "version": "0.1.0",
   "private": true,
-  "description": "四号棟 — 解体前夜の団地をのぼる一人称ホラー。ブラウザだけで遊べます。",
+  "description": "死鏡団地 — 解体前夜の団地をのぼる一人称ホラー。ブラウザだけで遊べます。",
   "scripts": {
     "start": "node serve.js"
   },
