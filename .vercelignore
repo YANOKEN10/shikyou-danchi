@@ -1,0 +1,6 @@
+node_modules
+.devdata
+serve.js
+*.zip
+.env*
+shots

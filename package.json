@@ -1,0 +1,12 @@
+{
+  "name": "yongoutou",
+  "version": "0.1.0",
+  "private": true,
+  "description": "四号棟 — 解体前夜の団地をのぼる一人称ホラー。ブラウザだけで遊べます。",
+  "scripts": {
+    "start": "node serve.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.0.0"
+  }
+}
