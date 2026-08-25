@@ -286,6 +286,12 @@ export class Game {
     if (!this.running) return;
     requestAnimationFrame(() => this._loop());
 
+    // 画面の大きさが変わったのに resize が来なかったとき（裏で開かれていた等）の保険
+    if (this.canvas.width !== Math.round(innerWidth * this.renderer.getPixelRatio()) ||
+        this.canvas.height !== Math.round(innerHeight * this.renderer.getPixelRatio())) {
+      if (innerWidth > 0 && innerHeight > 0) this._resize();
+    }
+
     let dt = this.clock.getDelta();
     if (dt > 0.1) dt = 0.1;
 
