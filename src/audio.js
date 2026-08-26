@@ -325,6 +325,72 @@ export class Sound {
     setTimeout(() => { try { a.src.stop(); a.lfo.stop(); } catch (e) {} }, 1400);
   }
 
+  // 部屋の中の空気（低く、耳に残る唸り）
+  roomToneOn() {
+    if (!this.ready || this._room) return;
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator(); osc.type = "sine"; osc.frequency.value = 52;
+    const osc2 = ctx.createOscillator(); osc2.type = "sine"; osc2.frequency.value = 78.5;
+    const src = this._src(true);
+    const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 240; f.Q.value = 0.6;
+    const ng = ctx.createGain(); ng.gain.value = 0.05;
+    src.connect(f); f.connect(ng);
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+    osc.connect(g); osc2.connect(g); ng.connect(g);
+    g.connect(this.master);
+    osc.start(); osc2.start(); src.start();
+    g.gain.setTargetAtTime(0.075, this.t, 0.9);
+    this._room = { osc, osc2, src, g };
+  }
+
+  roomToneOff() {
+    if (!this._room) return;
+    const r = this._room; this._room = null;
+    r.g.gain.setTargetAtTime(0.0001, this.t, 0.35);
+    setTimeout(() => { try { r.osc.stop(); r.osc2.stop(); r.src.stop(); } catch (e) {} }, 1200);
+  }
+
+  // 廊下を、誰かが通っていく足音
+  passBy() {
+    if (!this.ready || this.muted) return;
+    const n = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) {
+      setTimeout(() => {
+        const far = Math.abs(i - n / 2) / (n / 2);       // 近づいて、遠ざかる
+        const v = 0.06 + (1 - far) * 0.16;
+        this.burst({ freq: rnd(120, 180), q: 1.2, vol: v, dur: 0.1, wet: 1.4 });
+        this.burst({ freq: rnd(2400, 3200), q: 0.8, vol: v * 0.2, dur: 0.04, wet: 0.6 });
+      }, i * rnd(430, 520));
+    }
+  }
+
+  // 水の音（風呂の向こう）
+  waterOn() {
+    if (!this.ready || this._water) return;
+    const ctx = this.ctx;
+    const src = this._src(true);
+    const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 2600; f.Q.value = 0.9;
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start();
+    g.gain.setTargetAtTime(0.028, this.t, 0.6);
+    this._water = { src, g };
+  }
+
+  waterOff() {
+    if (!this._water) return;
+    const w = this._water; this._water = null;
+    w.g.gain.setTargetAtTime(0.0001, this.t, 0.12);
+    setTimeout(() => { try { w.src.stop(); } catch (e) {} }, 700);
+  }
+
+  // 扉が勢いよく閉まる
+  slam() {
+    this.burst({ freq: 110, q: 0.7, vol: 0.6, dur: 0.22, wet: 1.6 });
+    this.tone({ type: "triangle", f0: 74, f1: 32, vol: 0.34, dur: 0.4, wet: 1.2 });
+    setTimeout(() => this.burst({ freq: 2400, q: 5, vol: 0.14, dur: 0.05, wet: 0.8 }), 45);
+  }
+
   // 蛍光灯のうなり
   buzzOn(level) {
     if (!this.ready) return;
@@ -403,5 +469,7 @@ export class Sound {
     this.buzzOff();
     this._stopHeart();
     this.breathOff();
+    this.roomToneOff();
+    this.waterOff();
   }
 }

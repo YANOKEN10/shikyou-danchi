@@ -33,10 +33,10 @@ export const FLOORS = [
     stairHint: "",
     units: [
       { no: 101, enter: true, item: "light", note: "自分の家だったころ、傘立ての上に置いていた。" },
-      { no: 102, enter: false },
-      { no: 103, enter: false },
-      { no: 104, enter: false },
-      { no: 105, enter: false },
+      { no: 102, enter: true },
+      { no: 103, enter: true },
+      { no: 104, enter: true },
+      { no: 105, enter: true },
     ],
     board: {
       memo: "m1",
@@ -58,11 +58,11 @@ export const FLOORS = [
     stairKey: "key3",
     stairHint: "階段の扉に、南京錠がかかっている。",
     units: [
-      { no: 201, enter: false },
+      { no: 201, enter: true },
       { no: 202, enter: true, item: "key3", memo: "m3draft", note: "台所の壁のフックに、鍵が一本ぶら下がっていた。" },
-      { no: 203, enter: false },
-      { no: 204, enter: false },
-      { no: 205, enter: false },
+      { no: 203, enter: true },
+      { no: 204, enter: true },
+      { no: 205, enter: true },
     ],
     post: { memo: "m2" },
     events: [
@@ -84,11 +84,11 @@ export const FLOORS = [
     stairHint: "階段室が暗すぎて、扉の位置さえ分からない。",
     breaker: { say: "廊下の端の鉄箱。中のつまみが、下がったままだ。" },
     units: [
-      { no: 301, enter: false },
-      { no: 302, enter: false },
+      { no: 301, enter: true },
+      { no: 302, enter: true },
       { no: 303, enter: true, memo: "m3", item: "battery", note: "管理人の詰所だった部屋。棚に日誌の切れ端が挟まっている。" },
-      { no: 304, enter: false },
-      { no: 305, enter: false },
+      { no: 304, enter: true },
+      { no: 305, enter: true },
     ],
     events: [
       { at: 3, once: true, say: "……足音が、二重に聞こえる。" },
@@ -105,11 +105,11 @@ export const FLOORS = [
     entity: { speed: 1.25, hear: 12, sight: 16, patience: 7 },
     stairLocked: false,
     units: [
-      { no: 401, enter: false },
-      { no: 402, enter: false },
-      { no: 403, enter: false },
-      { no: 404, enter: false },
-      { no: 405, enter: false },
+      { no: 401, enter: true },
+      { no: 402, enter: true },
+      { no: 403, enter: true },
+      { no: 404, enter: true },
+      { no: 405, enter: true },
     ],
     graffiti: { memo: "m4" },
     // ループの周ごとの変化
@@ -128,17 +128,167 @@ export const FLOORS = [
     entity: null,
     stairLocked: false,
     units: [
-      { no: 501, enter: false },
-      { no: 502, enter: false },
-      { no: 503, enter: false },
+      { no: 501, enter: true },
+      { no: 502, enter: true },
+      { no: 503, enter: true },
       { no: 504, enter: true, memo: "m6", goal: true, note: "自分の家。表札はまだ外されていない。" },
-      { no: 505, enter: false },
+      { no: 505, enter: true },
     ],
     events: [
       { at: 2, once: true, say: "……電気は止まっているはずだ。" },
     ],
   },
 ];
+
+/* ---------- 住戸の中 ---------- */
+// kind    … 置いてある家財のひとそろい（build.js が組み立てます）
+// floor   … 床の張りかた "tatami" | "wood" | "bare"
+// enter   … はじめて入ったときの一言
+// detail  … 中のものを調べたときの一言（{ label, say } または say だけ）
+// scare   … こわいしかけ。build.js と game.js が見ています
+//            mirror(鏡にうつる) / bulge(布団のふくらみ) / eyes(すきまの目)
+//            static(砂嵐) / turned(こちらを向く) / warm(まだ温かい)
+
+export const ROOMS = {
+  /* --- 一階 --- */
+  101: {
+    kind: "kitchen", floor: "tatami",
+    enter: "自分の家だったころの部屋。畳の目まで覚えている。",
+    detail: { label: "靴箱を見る", say: "傘立ての上。やっぱり、そこにあった。" },
+  },
+  102: {
+    kind: "butsudan", floor: "tatami", scare: "portrait",
+    enter: "一〇二号室。佐々木さんの家だ。仏間の匂いがまだ残っている。",
+    detail: { label: "仏壇を見る", say: "線香が、途中まで燃えて折れている。灰はまだ温かい。" },
+  },
+  103: {
+    kind: "boxes", floor: "wood",
+    enter: "引っ越しの途中で止まったまま、十何年たった部屋。",
+    detail: { label: "段ボールを開ける", say: "衣類。いちばん下に、髪の毛が一束、輪ゴムでまとめてある。" },
+  },
+  104: {
+    kind: "child", floor: "wood", scare: "scribble",
+    enter: "子ども部屋。柱に、背の高さの傷が並んでいる。",
+    detail: { label: "傷を数える", say: "十二本ある。最後の一本だけ、天井近くに刻まれている。" },
+  },
+  105: {
+    kind: "empty", floor: "tatami", scare: "shape",
+    enter: "からっぽの部屋。家財の跡だけが、畳に焼きついている。",
+    detail: { label: "畳の跡を見る", say: "箪笥、卓袱台、それから——人がひとり、ずっと座っていた形。" },
+  },
+
+  /* --- 二階 --- */
+  201: {
+    kind: "trash", floor: "wood", scare: "eyes",
+    enter: "袋の山。中身は分からない。踏むと、やわらかい。",
+    detail: { label: "袋を見る", say: "いちばん上の袋が、いま、ゆっくり沈んだ。" },
+  },
+  202: {
+    kind: "kitchen", floor: "tatami",
+    enter: "台所の壁のフックに、鍵が一本ぶら下がっていた。",
+    detail: { label: "冷蔵庫を開ける", say: "電気は止まっているのに、中が冷えている。" },
+  },
+  203: {
+    kind: "bath", floor: "bare", scare: "water",
+    enter: "水回りの部屋。奥の扉の向こうから、水の音がする。",
+    detail: { label: "風呂の扉を開ける", say: "音が止んだ。浴槽は乾ききっている。髪だけが、排水口から伸びている。" },
+  },
+  204: {
+    kind: "mirrors", floor: "tatami", scare: "mirror",
+    enter: "姿見が三枚、壁に立てかけてある。どれも布がかけてあった形跡がある。",
+    detail: { label: "鏡を覗く", say: "自分が映っている。……こちらを向くのが、一拍おそい。" },
+  },
+  205: {
+    kind: "futon", floor: "tatami", scare: "warm",
+    enter: "二〇五号室。高木さんの家。万年床が敷きっぱなしだ。",
+    detail: { label: "布団に触れる", say: "へこんでいる。人の形に。まだ、温かい。" },
+  },
+
+  /* --- 三階 --- */
+  301: {
+    kind: "flowers", floor: "tatami",
+    enter: "三〇一号室。中村さんの家。花瓶がいくつも並んでいる。",
+    detail: { label: "花瓶を見る", say: "花はすべて枯れている。水だけが、新しい。" },
+  },
+  302: {
+    kind: "storage", floor: "bare", scare: "eyes",
+    enter: "物置。家財が天井まで積み上がって、奥へは行けない。",
+    detail: { label: "すきまを覗く", say: "奥に、たんすが一棹。その陰から、こちらを見ている。" },
+  },
+  303: {
+    kind: "office", floor: "wood",
+    enter: "管理人の詰所だった部屋。棚に日誌の切れ端が挟まっている。",
+    detail: { label: "書類棚を見る", say: "住民名簿。八月のところで、名前が一つずつ、線で消されている。" },
+  },
+  304: {
+    kind: "tv", floor: "tatami", scare: "static",
+    enter: "テレビがついている。電気は止まっているはずだ。",
+    detail: { label: "画面を見る", say: "砂嵐——のあいだに、いま歩いてきた廊下が、一瞬だけ映った。" },
+  },
+  305: {
+    kind: "dolls", floor: "wood", scare: "turned",
+    enter: "子ども部屋。ぬいぐるみが棚に並んでいる。全部、壁を向いている。",
+    detail: { label: "ぬいぐるみを見る", say: "顔をこちらに直した。……一つだけ、もともとこちらを向いていた。" },
+  },
+
+  /* --- 四階 --- */
+  401: {
+    kind: "empty", floor: "tatami", scare: "shape",
+    enter: "何もない。畳だけが、新しく替えられている。",
+    detail: { label: "畳を見る", say: "四階の畳だけ、どこも新しい。替える必要が、あったのだろうか。" },
+  },
+  402: {
+    kind: "boxes", floor: "wood",
+    enter: "段ボールに、几帳面な字で中身が書いてある。",
+    detail: { label: "字を読む", say: "「たいせつなもの」。全部の箱に、同じ字で。" },
+  },
+  403: {
+    kind: "mirrors", floor: "bare", scare: "mirror",
+    enter: "壁という壁に、鏡が貼りつけてある。合わせ鏡になっている。",
+    detail: { label: "合わせ鏡を覗く", say: "奥へ、奥へ、自分が続いている。……七番目から、数が合わない。" },
+  },
+  404: {
+    kind: "letter", floor: "tatami", scare: "bulge",
+    enter: "四〇四号室。表札の枠だけが残っている。",
+    detail: { label: "部屋を見まわす", say: "誰も住んでいない部屋のはずが、掃除が行き届いている。" },
+  },
+  405: {
+    kind: "futon", floor: "tatami", scare: "bulge",
+    enter: "布団が敷いてある。まんなかが、ふくらんでいる。",
+    detail: { label: "布団をめくる", say: "何もない。掛け布団の内側だけが、人肌の温度をしている。" },
+  },
+
+  /* --- 五階 --- */
+  501: {
+    kind: "flowers", floor: "tatami",
+    enter: "花の匂いがする。枯れているのに。",
+    detail: { label: "花を見る", say: "供花だ。名札に、この棟の号室が書いてある。全部で四つ。" },
+  },
+  502: {
+    kind: "empty", floor: "wood",
+    enter: "がらんとした部屋。窓だけが、きれいに拭いてある。",
+    detail: { label: "窓を見る", say: "内側から拭いてある。指の跡が、外側にも同じだけ付いている。" },
+  },
+  503: {
+    kind: "mirrors", floor: "tatami", scare: "mirror",
+    enter: "姿見が一枚。ちょうど、玄関を映す向きに置いてある。",
+    detail: { label: "鏡を見る", say: "玄関が映っている。いま閉めたはずの扉が、開いている。" },
+  },
+  504: {
+    kind: "home", floor: "tatami",
+    enter: "自分の家。表札はまだ外されていない。",
+    detail: { label: "部屋を見まわす", say: "母が出ていった日のまま。灰皿の上で、線香が一本、燃え尽きている。" },
+  },
+  505: {
+    kind: "butsudan", floor: "tatami", scare: "portrait",
+    enter: "仏間。位牌がいくつも並んでいる。数が多すぎる。",
+    detail: { label: "位牌を数える", say: "十九。この棟に住んでいた世帯の数と、同じだ。" },
+  },
+};
+
+export function roomFor(no) {
+  return ROOMS[no] || { kind: "kitchen", floor: "tatami", enter: "" };
+}
 
 /* ---------- 読めるもの ---------- */
 

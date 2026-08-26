@@ -292,6 +292,230 @@ export function paintedSteel() {
   }, 3, 1);
 }
 
+// フローリング（板張り）
+export function flooring(rx, ry) {
+  return tex("floorw", 256, 256, (g, w, h) => {
+    g.fillStyle = "#6b5334"; g.fillRect(0, 0, w, h);
+    const bh = 32;
+    for (let y = 0, i = 0; y < h; y += bh, i++) {
+      const off = (i % 2) * 60;
+      for (let x = -60; x < w; x += 120) {
+        const c = 92 + (Math.random() * 26 | 0);
+        g.fillStyle = "rgb(" + c + "," + (c - 22) + "," + (c - 48) + ")";
+        g.fillRect(x + off + 1, y + 1, 118, bh - 2);
+        // 木目
+        g.strokeStyle = "rgba(0,0,0,0.10)"; g.lineWidth = 1;
+        for (let k = 0; k < 3; k++) {
+          const yy = y + 6 + k * 9 + Math.random() * 3;
+          g.beginPath(); g.moveTo(x + off + 2, yy); g.lineTo(x + off + 117, yy + (Math.random() - 0.5) * 3); g.stroke();
+        }
+      }
+    }
+    blotch(g, w, h, 14, 16, 80, "40,28,14", 0.08, 0.26);
+    grain(g, w, h, 16);
+  }, rx || 3, ry || 3);
+}
+
+// 段ボール
+export function cardboard() {
+  return tex("cardb", 128, 128, (g, w, h) => {
+    g.fillStyle = "#9c7c4e"; g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 4) {
+      g.fillStyle = y % 8 === 0 ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.04)";
+      g.fillRect(0, y, w, 2);
+    }
+    blotch(g, w, h, 10, 10, 44, "94,68,36", 0.10, 0.28);
+    // 貼られたガムテープ
+    g.fillStyle = "rgba(200,180,140,0.55)"; g.fillRect(0, 54, w, 18);
+    grain(g, w, h, 14);
+  }, 1, 1);
+}
+
+// 砂嵐（テレビ）。何枚か作って、順ぐりに差し替えると動いて見えます
+export function tvStatic(i) {
+  return tex("tvs" + (i || 0), 128, 96, (g, w, h) => {
+    const img = g.createImageData(w, h);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = 30 + Math.random() * 190;
+      img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v + 8; img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    // 走査線
+    g.fillStyle = "rgba(0,0,0,0.22)";
+    for (let y = 0; y < h; y += 3) g.fillRect(0, y, w, 1);
+  }, 1, 1);
+}
+
+// 鏡の面（古い姿見。銀が曇っている）
+export function mirrorGlass() {
+  return tex("mirrorg", 256, 512, (g, w, h) => {
+    const bg = g.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, "#39434c");
+    bg.addColorStop(0.45, "#232c34");
+    bg.addColorStop(0.7, "#2e3841");
+    bg.addColorStop(1, "#1a2027");
+    g.fillStyle = bg; g.fillRect(0, 0, w, h);
+    // 斜めの映り込み
+    g.save();
+    g.translate(w / 2, h / 2); g.rotate(-0.5);
+    const sh = g.createLinearGradient(-w, 0, w, 0);
+    sh.addColorStop(0, "rgba(190,205,220,0)");
+    sh.addColorStop(0.5, "rgba(190,205,220,0.16)");
+    sh.addColorStop(1, "rgba(190,205,220,0)");
+    g.fillStyle = sh; g.fillRect(-w, -h * 0.2, w * 2, h * 0.4);
+    g.restore();
+    // 銀の曇り（点々と、ふちの腐食）
+    blotch(g, w, h, 26, 8, 44, "60,54,44", 0.10, 0.40);
+    blotch(g, w, h, 8, 20, 70, "18,20,24", 0.10, 0.34);
+    g.fillStyle = "rgba(30,26,20,0.5)";
+    for (let i = 0; i < 90; i++) {
+      const e = Math.random();
+      const x = e < 0.5 ? Math.random() * 26 : w - Math.random() * 26;
+      g.beginPath(); g.arc(x, Math.random() * h, 1 + Math.random() * 4, 0, 7); g.fill();
+    }
+    grain(g, w, h, 10);
+  }, 1, 1);
+}
+
+// カレンダー（何かの日に丸がついている）
+export function calendar() {
+  return tex("calendar", 200, 280, (g, w, h) => {
+    g.fillStyle = "#e2dbc8"; g.fillRect(0, 0, w, h);
+    g.fillStyle = "#3a3a3a"; g.fillRect(0, 0, w, 54);
+    g.fillStyle = "#e8e2d2";
+    g.font = "bold 30px 'MS Gothic', serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("八月", w / 2, 28);
+    g.fillStyle = "#3a3a3a";
+    g.font = "13px 'MS Gothic', monospace";
+    let n = 1;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 7 && n <= 31; c++, n++) {
+        g.fillStyle = c === 0 ? "#9a3a3a" : "#3a3a3a";
+        g.fillText(String(n), 18 + c * 27, 76 + r * 34);
+      }
+    }
+    // 三十一日に、赤い丸
+    g.strokeStyle = "rgba(160,40,40,0.9)"; g.lineWidth = 2.5;
+    g.beginPath(); g.arc(18 + 2 * 27, 76 + 4 * 34, 13, 0, 7); g.stroke();
+    blotch(g, w, h, 8, 14, 60, "150,138,108", 0.05, 0.18);
+    grain(g, w, h, 10);
+  }, 1, 1);
+}
+
+// 遺影（顔のところが削られている）
+export function portrait() {
+  return tex("portrait", 256, 320, (g, w, h) => {
+    g.fillStyle = "#1a1712"; g.fillRect(0, 0, w, h);
+    g.fillStyle = "#c9c3b2"; g.fillRect(20, 20, w - 40, h - 40);
+    // 肩と首
+    g.fillStyle = "#8e897c";
+    g.beginPath(); g.ellipse(w / 2, h - 40, 78, 62, 0, 0, 7); g.fill();
+    g.fillStyle = "#a49e90"; g.fillRect(w / 2 - 16, h - 130, 32, 40);
+    // 顔——描かない。こすり取られている
+    g.fillStyle = "#b4aea0";
+    g.beginPath(); g.ellipse(w / 2, h - 168, 48, 58, 0, 0, 7); g.fill();
+    g.save();
+    g.globalCompositeOperation = "destination-out";
+    for (let i = 0; i < 60; i++) {
+      g.beginPath();
+      g.arc(w / 2 + (Math.random() - 0.5) * 84, h - 168 + (Math.random() - 0.5) * 96, 6 + Math.random() * 13, 0, 7);
+      g.fill();
+    }
+    g.restore();
+    g.fillStyle = "rgba(20,18,14,0.85)";
+    for (let i = 0; i < 40; i++) {
+      g.fillRect(w / 2 - 46 + Math.random() * 92, h - 214 + Math.random() * 96, 2 + Math.random() * 8, 1 + Math.random() * 3);
+    }
+    // 黒いリボン
+    g.fillStyle = "#17150f"; g.fillRect(20, 20, 62, 10); g.fillRect(w - 82, 20, 62, 10);
+    blotch(g, w, h, 8, 20, 70, "120,110,88", 0.06, 0.20);
+    grain(g, w, h, 14);
+  }, 1, 1);
+}
+
+// 子どもの落書き（背景は透ける）
+export function scribble() {
+  const key = "scribble";
+  if (cache.has(key)) return cache.get(key);
+  const c = cv(256, 256);
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, 256, 256);
+  // 家族の絵。人が四人。ひとりだけ顔がない
+  const person = (x, y, s, col, face) => {
+    g.strokeStyle = col; g.lineWidth = 3.2; g.lineCap = "round";
+    g.beginPath(); g.arc(x, y - s * 1.15, s * 0.42, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(x, y - s * 0.72); g.lineTo(x, y + s * 0.5); g.stroke();
+    g.beginPath(); g.moveTo(x - s * 0.6, y - s * 0.1); g.lineTo(x + s * 0.6, y - s * 0.1); g.stroke();
+    g.beginPath(); g.moveTo(x, y + s * 0.5); g.lineTo(x - s * 0.45, y + s * 1.2); g.stroke();
+    g.beginPath(); g.moveTo(x, y + s * 0.5); g.lineTo(x + s * 0.45, y + s * 1.2); g.stroke();
+    if (face) {
+      g.beginPath(); g.arc(x - s * 0.15, y - s * 1.2, 2.2, 0, 7); g.fill();
+      g.beginPath(); g.arc(x + s * 0.15, y - s * 1.2, 2.2, 0, 7); g.fill();
+    }
+  };
+  g.fillStyle = "#3a5a8a";
+  person(52, 150, 30, "#3a5a8a", true);
+  g.fillStyle = "#a03a3a";
+  person(112, 150, 28, "#a03a3a", true);
+  g.fillStyle = "#3a7a4a";
+  person(168, 152, 24, "#3a7a4a", true);
+  g.fillStyle = "#2a2a2a";
+  person(220, 148, 34, "#2a2a2a", false);   // この子だけ、顔がない
+  g.fillStyle = "rgba(60,60,60,0.8)";
+  g.font = "bold 20px 'MS Gothic', monospace";
+  g.fillText("かぞく", 16, 44);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t);
+  return t;
+}
+
+// 鏡にうつるもの（うすい人影。背景は透ける）
+export function figure() {
+  const key = "figure";
+  if (cache.has(key)) return cache.get(key);
+  const c = cv(128, 256);
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, 128, 256);
+  const col = (a) => "rgba(196,204,214," + a + ")";
+  // 頭
+  let grd = g.createRadialGradient(64, 62, 2, 64, 62, 30);
+  grd.addColorStop(0, col(0.85)); grd.addColorStop(1, col(0));
+  g.fillStyle = grd; g.beginPath(); g.ellipse(64, 62, 26, 32, 0, 0, 7); g.fill();
+  // 胴
+  grd = g.createLinearGradient(0, 90, 0, 250);
+  grd.addColorStop(0, col(0.75)); grd.addColorStop(0.75, col(0.28)); grd.addColorStop(1, col(0));
+  g.fillStyle = grd;
+  g.beginPath();
+  g.moveTo(40, 96); g.quadraticCurveTo(64, 84, 88, 96);
+  g.lineTo(98, 250); g.lineTo(30, 250); g.closePath(); g.fill();
+  // 目のあたりの闇
+  g.fillStyle = "rgba(6,8,12,0.75)";
+  g.beginPath(); g.ellipse(55, 58, 5, 8, 0, 0, 7); g.fill();
+  g.beginPath(); g.ellipse(73, 58, 5, 8, 0, 0, 7); g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t);
+  return t;
+}
+
+// 貼り紙
+export function poster(lines, tone) {
+  const key = "poster:" + lines.join("|");
+  return tex(key, 256, 320, (g, w, h) => {
+    g.fillStyle = tone || "#ded6c0"; g.fillRect(0, 0, w, h);
+    blotch(g, w, h, 10, 16, 70, "150,138,108", 0.05, 0.18);
+    g.fillStyle = "#26241f";
+    g.textAlign = "center"; g.textBaseline = "top";
+    g.font = "bold 26px 'MS Gothic', serif";
+    g.fillText(lines[0] || "", w / 2, 34);
+    g.font = "19px 'MS Gothic', serif";
+    for (let i = 1; i < lines.length; i++) g.fillText(lines[i], w / 2, 82 + (i - 1) * 30);
+    grain(g, w, h, 12);
+  }, 1, 1);
+}
+
 // 壁の落書き（背景が透けるので、壁に重ねて貼ります）
 export function graffiti(text) {
   const key = "graffiti:" + text;

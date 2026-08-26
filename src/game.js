@@ -5,6 +5,7 @@
 // ============================================================
 import * as THREE from "../lib/three.module.js";
 import * as B from "./build.js";
+import * as TX from "./textures.js";
 import { Player } from "./player.js";
 import { Stalkers, Apparition } from "./entity.js";
 import { UI } from "./ui.js";
@@ -252,6 +253,14 @@ export class Game {
       this.stalkers.spawn(ecfg, this.floor.len, lapDef ? lapDef.entities : 1);
     }
 
+    // 部屋まわりの状態を初期化
+    this.curRoom = null;
+    this.slamDoor = null;
+    this.slamT = 0;
+    this.passT = 999;
+    this.snd.roomToneOff();
+    this.snd.waterOff();
+
     // 事件の時計
     this.floorTime = 0;
     this.eventsDone = new Set();
@@ -309,7 +318,43 @@ export class Game {
     const f = this.floor;
 
     p.update(dt, f.col);
-    p.inUnit = this._insideUnit();
+
+    // 住戸の出入り
+    const rec = this._insideUnit();
+    p.inUnit = Boolean(rec);
+    if (rec !== this.curRoom) {
+      if (this.curRoom) this._roomExit();
+      this.curRoom = rec;
+      if (rec) this._roomEnter(rec);
+    }
+
+    if (p.inUnit) {
+      // 廊下を、誰かが通っていく
+      this.passT -= dt;
+      if (this.passT <= 0) {
+        this.passT = 22 + Math.random() * 30;
+        this.snd.passBy();
+        if (Math.random() < 0.55) this.ui.say("……廊下を、誰かが通った。");
+      }
+      // 扉がひとりでに閉まる
+      if (this.slamT > 0) {
+        this.slamT -= dt;
+        if (this.slamT <= 0 && this.slamDoor && this.slamDoor.open) {
+          const d = this.slamDoor;
+          this.slamDoor = null;
+          d.open = false;
+          d.col = f.col.add(d.dx - B.D.DOOR_W / 2, B.D.CORR_Z0 - 0.1, d.dx + B.D.DOOR_W / 2, B.D.CORR_Z0 + 0.06, "door");
+          this._swing(d, 0);
+          const di = f.inter.find((i2) => i2.kind === "door" && i2.door === d);
+          if (di) di.label = "開ける";
+          this.snd.slam();
+          this.ui.hit();
+          this.ui.sayNow("——扉が、閉まった。");
+        }
+      }
+    }
+
+    this._roomFx(dt);
 
     // 懐中電灯
     const on = p.lightOn && p.hasLight && p.battery > 0;
@@ -366,15 +411,190 @@ export class Game {
     if (p.wantPause) { p.wantPause = false; this.doPause(); }
   }
 
+  // いま入っている住戸（入っていなければ null）
   _insideUnit() {
     const p = this.player.pos;
-    if (p.z > -0.1) return false;
+    if (p.z > -0.1) return null;
     for (const d of this.floor.doors) {
       if (!d.unitBounds) continue;
       const b = d.unitBounds;
-      if (p.x > b.x0 && p.x < b.x1 && p.z < b.z0 && p.z > b.z1) return true;
+      if (p.x > b.x0 && p.x < b.x1 && p.z < b.z0 && p.z > b.z1) return d;
     }
-    return false;
+    return null;
+  }
+
+  /* ---------------- 部屋の中 ---------------- */
+
+  // 扉を開けたとき
+  _roomOpened(d) {
+    const room = d.room || {};
+    const key = "note" + d.no + "_" + d.dx.toFixed(1);
+    if (!this.usedInter.has(key)) {
+      this.usedInter.add(key);
+      const line = (d.unit && d.unit.note) || room.enter;
+      if (line) this.ui.say(line);
+    }
+
+    // ときどき、部屋の奥に立っている
+    if (!d.peeked && Math.random() < 0.16 && this.state.floor >= 2) {
+      d.peeked = true;
+      const b = d.unitBounds;
+      if (b) {
+        this.appar.show(d.dx + (Math.random() - 0.5) * 1.6, b.z1 + 0.9, 1.1 + Math.random() * 0.6);
+        this.snd.whisper();
+        this.ui.hit();
+      }
+    }
+  }
+
+  // 部屋に入った／出た
+  _roomEnter(d) {
+    this.snd.roomToneOn();
+    const room = d.room || {};
+    if (room.scare === "water") this.snd.waterOn();
+
+    // 廊下を誰かが通る音（部屋にいるあいだ）
+    this.passT = 9 + Math.random() * 14;
+
+    // まれに、扉がひとりでに閉まる
+    if (!d.slammed && this.state.floor >= 2 && Math.random() < 0.22) {
+      d.slammed = true;
+      this.slamT = 2.6 + Math.random() * 3.4;
+      this.slamDoor = d;
+    }
+  }
+
+  _roomExit() {
+    this.snd.roomToneOff();
+    this.snd.waterOff();
+    this.slamT = 0;
+    this.slamDoor = null;
+  }
+
+  // 部屋の中の「調べる」に付いているしかけ
+  _detailScare(it) {
+    const s = it.scare;
+    if (!s) return;
+    if (s === "bulge") {
+      const f = this.floor.fx.find((k) => k.kind === "bulge" && !k.done);
+      if (f) { f.done = true; f.deflate = 0.001; }
+      this.snd.whisper();
+    } else if (s === "water") {
+      this.snd.waterOff();
+      this.snd.thud(true);
+    } else if (s === "portrait") {
+      this.snd.whisper();
+      this.ui.hit();
+    } else if (s === "eyes") {
+      const f = this.floor.fx.find((k) => k.kind === "eyes");
+      if (f) f.mesh.visible = false;
+      this.snd.whisper();
+      this.ui.hit();
+    } else if (s === "turned") {
+      const f = this.floor.fx.find((k) => k.kind === "turned");
+      if (f) f.dolls.forEach((g2) => { g2.rotation.y = 0; });
+      this.snd.stinger();
+      this.ui.hit();
+    } else if (s === "mirror") {
+      const f = this.floor.fx.find((k) => k.kind === "mirror");
+      if (f) { f.ph = 0.0001; f.t = 14 + Math.random() * 14; }
+      this.snd.whisper();
+    } else if (s === "static") {
+      const f = this.floor.fx.find((k) => k.kind === "static");
+      if (f) f.burst = 1.6;
+      this.snd.whisper();
+    } else if (s === "shape" || s === "scribble" || s === "warm") {
+      this.snd.whisper();
+    }
+  }
+
+  // 部屋のしかけを、毎フレーム少しずつ動かす
+  _roomFx(dt) {
+    const fx = this.floor.fx;
+    if (!fx || !fx.length) return;
+    const p = this.player.pos;
+    const fwd = this.player.forward();
+
+    for (const f of fx) {
+      const dx = (f.x == null ? 0 : f.x) - p.x;
+      const dz = (f.z == null ? 0 : f.z) - p.z;
+      const dist = Math.hypot(dx, dz);
+      const facing = dist < 0.01 ? 1 : (dx / dist) * fwd.x + (dz / dist) * fwd.z;
+
+      if (f.kind === "mirror") {
+        // 見ているあいだに、うしろへ何かが立つ
+        if (f.ph != null && f.ph > 0) {
+          f.ph += dt / 1.6;
+          const k = Math.min(1, f.ph);
+          f.mesh.material.opacity = Math.sin(Math.PI * k) * 0.66;
+          if (f.ph >= 1) { f.ph = 0; f.mesh.material.opacity = 0; }
+        } else if (dist < 5 && facing > 0.55 && this.player.inUnit) {
+          f.t -= dt;
+          if (f.t <= 0) {
+            f.ph = 0.0001;
+            f.t = 16 + Math.random() * 20;
+            this.snd.whisper();
+          }
+        }
+      } else if (f.kind === "static") {
+        f.t = (f.t || 0) + dt;
+        if (f.t > 0.07) {
+          f.t = 0;
+          f.i = ((f.i || 0) + 1) % 4;
+          f.mesh.material.map = TX.tvStatic(f.i);
+          f.mesh.material.needsUpdate = true;
+        }
+        const b = f.burst > 0 ? (f.burst -= dt, 3.4) : 1;
+        f.light.intensity = (1.6 + Math.random() * 1.4) * b;
+      } else if (f.kind === "eyes") {
+        // 近づくと、いなくなる
+        if (dist < 2.0 && f.mesh.visible) {
+          f.mesh.visible = false;
+          this.snd.whisper();
+        }
+      } else if (f.kind === "turned") {
+        // 見ていないあいだに、一つずつこちらを向く
+        if (this.player.inUnit && dist < 6) {
+          if (facing < 0.2) {
+            f.t = (f.t || 0) + dt;
+            if (f.t > 2.4) {
+              f.t = 0;
+              const still = f.dolls.filter((g2) => Math.abs(g2.rotation.y) > 0.1);
+              if (still.length) still[Math.floor(Math.random() * still.length)].rotation.y = 0;
+            }
+          } else f.t = 0;
+        }
+      } else if (f.kind === "bulge") {
+        if (f.deflate != null) {
+          f.deflate = Math.min(1, f.deflate + dt * 1.6);
+          const k = 1 - f.deflate;
+          f.mesh.scale.y = 0.42 * Math.max(0.04, k);
+          f.mesh.position.y = f.y0 * Math.max(0.15, k);
+        } else if (this.player.inUnit && dist < 4) {
+          // ゆっくり上下する（息をしているように）
+          f.mesh.position.y = f.y0 + Math.sin(performance.now() * 0.0011) * 0.012;
+        }
+      } else if (f.kind === "sink") {
+        if (this.player.inUnit && dist < 5 && facing < 0.3) {
+          f.mesh.position.y = Math.max(0.34, f.mesh.position.y - dt * 0.05);
+        }
+      } else if (f.kind === "cord") {
+        // そばを通ると、引き紐が揺れる。誰もいなくても、ときどき揺れる
+        if (dist < 1.4 && this.player.moving) f.sway = 1;
+        else if (this.player.inUnit && dist < 5 && Math.random() < 0.0006) f.sway = 0.7;
+        if (f.sway > 0.001) {
+          f.sway *= Math.pow(0.55, dt);
+          const a = Math.sin(performance.now() * 0.006) * 0.28 * f.sway;
+          f.mesh.rotation.z = a;
+          f.knob.rotation.z = a;
+          f.mesh.position.x = f.x + 0.16 + Math.sin(a) * 0.3;
+          f.knob.position.x = f.x + 0.16 + Math.sin(a) * 0.62;
+        }
+      } else if (f.kind === "water") {
+        // 近づくと、音が止まる
+        if (dist < 1.8) this.snd.waterOff();
+      }
+    }
   }
 
   /* ---------------- 出来事 ---------------- */
@@ -452,16 +672,16 @@ export class Game {
         this.ui.sayNow(d.no === 404 ? "……四〇四号室。名前の札が、無い。" : "鍵がかかっている。人の気配もない。");
         return;
       }
+      // 中身は、開けたときにはじめて組み立てます
+      if (!d.built && d.build) d.build();
+
       d.open = !d.open;
       if (d.open) {
         this.snd.doorOpen();
         this.floor.col.remove(d.col);
         this._swing(d, -1.95);
         it.label = "閉める";
-        if (d.unit && d.unit.note && !this.usedInter.has("note" + d.no)) {
-          this.usedInter.add("note" + d.no);
-          this.ui.say(d.unit.note);
-        }
+        this._roomOpened(d);
       } else {
         this.snd.doorShut();
         d.col = this.floor.col.add(d.dx - B.D.DOOR_W / 2, B.D.CORR_Z0 - 0.1, d.dx + B.D.DOOR_W / 2, B.D.CORR_Z0 + 0.06, "door");
@@ -485,6 +705,13 @@ export class Game {
         this._swingTo(s.pivot, s.shut);
         it.label = "扉を開ける";
       }
+      return;
+    }
+
+    if (it.kind === "detail") {
+      it.done = true;
+      this.ui.sayNow(it.say);
+      this._detailScare(it);
       return;
     }
 
