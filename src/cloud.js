@@ -11,6 +11,7 @@
 
 const TOK = "shikyou:token";     // ログインの券
 const LOCAL = "shikyou:local";   // この端末だけの記録
+const OWNER = "shikyou:owner";   // その記録が誰のものか（空ならログインしていない人の記録）
 const LASTID = "shikyou:lastid"; // 前回の名前（入力欄の初期値に使う）
 
 function ls(fn, fallback) {
@@ -25,7 +26,8 @@ export class Cloud {
     this.mode = "guest";   // "cloud" | "guest"
   }
 
-  get signedIn() { return Boolean(this.token && this.user); }
+  // guestOnly … 券は残したまま、この回だけクラウドを使わない
+  get signedIn() { return Boolean(this.token && this.user && !this.guestOnly); }
   get display() { return this.user ? (this.user.display || this.user.id) : ""; }
 
   setToken(t) {
@@ -145,8 +147,28 @@ export class Cloud {
 
   // 端末内の記録（ログインしていない人・通信できないとき用）
   readLocal() { return ls(() => JSON.parse(localStorage.getItem(LOCAL) || "null"), null); }
-  writeLocal(payload) { ls(() => localStorage.setItem(LOCAL, JSON.stringify(payload))); }
-  clearLocal() { ls(() => localStorage.removeItem(LOCAL)); }
+
+  writeLocal(payload) {
+    ls(() => {
+      localStorage.setItem(LOCAL, JSON.stringify(payload));
+      // 誰の記録かを一緒に残す。ログインしていなければ空
+      localStorage.setItem(OWNER, this.user ? this.user.id : "");
+    });
+  }
+
+  clearLocal() {
+    ls(() => { localStorage.removeItem(LOCAL); localStorage.removeItem(OWNER); });
+  }
+
+  // 端末の記録の持ち主。空ならログインしていない人のもの
+  get localOwner() { return ls(() => localStorage.getItem(OWNER), "") || ""; }
+
+  // いまログインしている人が、その記録を引き継いでよいか
+  // （ログインしていない人の記録は引き継ぐ。別の人の記録には触らない）
+  canAdoptLocal() {
+    const o = this.localOwner;
+    return !o || (this.user && o === this.user.id);
+  }
 
   // 読み出し。ログインしていればサーバー、していなければ端末内
   async load() {

@@ -69,6 +69,7 @@ form.addEventListener("submit", async (e) => {
   try {
     if (mode === "guest") {
       cloud.mode = "guest";
+      cloud.guestOnly = true;      // この回はクラウドを使わない
       await afterAuth();
       return;
     }
@@ -88,6 +89,7 @@ form.addEventListener("submit", async (e) => {
       if (!r.ok) { setMsg(r.why, "err"); return; }
     }
     pwIn.value = "";
+    cloud.guestOnly = false;
     await afterAuth();
   } finally {
     goBtn.disabled = false;
@@ -97,6 +99,7 @@ form.addEventListener("submit", async (e) => {
 $("skip").onclick = () => {
   snd.unlock(); snd.ui();
   cloud.mode = "guest";
+  cloud.guestOnly = true;        // この回はクラウドを使わない
   afterAuth();
 };
 
@@ -114,23 +117,29 @@ function summarize(p) {
 async function afterAuth() {
   setMsg("記録を読んでいます…");
 
-  const local = cloud.readLocal();
+  // 別の人がこの端末で遊んだ記録は、引き継がない
+  const local = cloud.canAdoptLocal() ? cloud.readLocal() : null;
   let remote = null;
 
-  if (cloud.signedIn) {
-    const r = await cloud.load();
-    remote = r.payload;
+  try {
+    if (cloud.signedIn) {
+      const r = await cloud.load();
+      remote = r.payload;
 
-    // 端末に進み具合があって、クラウドが空なら預ける
-    if (local && !remote) {
-      await cloud.save(local, true);
-      remote = local;
-      setMsg("この端末の記録を、クラウドに預けました。", "ok");
-    } else if (local && remote && (local.seconds | 0) > (remote.seconds | 0) + 30) {
-      // どちらを使うか選んでもらう
-      chooseSave(local, remote);
-      return;
+      // 端末に進み具合があって、クラウドが空なら預ける
+      if (local && !remote) {
+        await cloud.save(local, true);
+        remote = local;
+        setMsg("この端末の記録を、クラウドに預けました。", "ok");
+      } else if (local && remote && (local.seconds | 0) > (remote.seconds | 0) + 30) {
+        // どちらを使うか選んでもらう
+        chooseSave(local, remote);
+        return;
+      }
     }
+  } catch (e) {
+    // 読み出しに失敗しても、ここで止めない。端末の記録で始める
+    remote = null;
   }
 
   const payload = cloud.signedIn ? (remote || local) : local;
@@ -139,6 +148,9 @@ async function afterAuth() {
 
 function chooseSave(local, remote) {
   const pick = $("pick");
+  // ログイン画面を必ず引っこめる（重なって見えなくなるため）
+  gate.classList.remove("show");
+  setMsg("");
   pick.classList.add("show");
   $("pickLocal").textContent = summarize(local);
   $("pickCloud").textContent = summarize(remote);
@@ -190,9 +202,18 @@ function bindTouch(g) {
 
 async function begin(payload) {
   gate.classList.remove("show");
+  $("pick").classList.remove("show");
   setMsg("");
 
-  const g = ensureGame();
+  let g;
+  try {
+    g = ensureGame();
+  } catch (e) {
+    // 3D が始められない端末。理由を出して、開いたままにしない
+    gate.classList.add("show");
+    setMsg("この端末では画面を描き始められませんでした。ブラウザを新しくするか、別の端末でお試しください。（" + (e && e.message ? e.message : "原因不明") + "）", "err");
+    return;
+  }
   updateWho();
 
   if (fromPause) {
@@ -230,7 +251,7 @@ function updateWho() {
     const cont = $("cont");
     cont.style.display = "block";
     $("contName").textContent = cloud.display;
-    cont.onclick = async () => { snd.unlock(); snd.ui(); await afterAuth(); };
+    cont.onclick = async () => { snd.unlock(); snd.ui(); cloud.guestOnly = false; await afterAuth(); };
     // ログイン欄は「別のアカウントで入る」用に残しておく
   }
 
