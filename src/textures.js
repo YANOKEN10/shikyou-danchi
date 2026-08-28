@@ -484,9 +484,10 @@ export function hair() {
     const len = 150 + Math.random() * 350;
     const w = 2 + Math.random() * 9;
     const grd = g.createLinearGradient(0, 0, 0, len);
-    grd.addColorStop(0, "rgba(8,8,10,1)");
-    grd.addColorStop(0.72, "rgba(10,10,13,0.95)");
-    grd.addColorStop(1, "rgba(12,12,15,0)");
+    const v = 48 + Math.random() * 22;          // 房ごとに、わずかな濃淡
+    grd.addColorStop(0, "rgba(" + v + "," + v + "," + (v + 5) + ",1)");
+    grd.addColorStop(0.72, "rgba(" + (v - 8) + "," + (v - 8) + "," + (v - 3) + ",0.95)");
+    grd.addColorStop(1, "rgba(10,10,14,0)");
     g.fillStyle = grd;
     g.save();
     g.translate(x, 0);
@@ -495,12 +496,44 @@ export function hair() {
     g.restore();
   }
   // てっぺんは必ず塞ぐ
-  g.fillStyle = "rgba(8,8,10,1)";
-  g.fillRect(0, 0, 256, 120);
+  g.fillStyle = "rgba(54,54,62,1)";
+  g.fillRect(0, 0, 256, 110);
+  // 分け目
+  g.fillStyle = "rgba(12,12,16,0.9)";
+  g.fillRect(120, 0, 10, 200);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   cache.set(key, t);
   return t;
+}
+
+// 「それ」の衣。縦の襞と、黴のような染み
+export function shroud() {
+  return tex("shroud", 256, 512, (g, w, h) => {
+    g.fillStyle = "#1b1b21"; g.fillRect(0, 0, w, h);
+    // 縦の襞。回り込むほど濃くなる
+    for (let x = 0; x < w; x += 1) {
+      const f = Math.sin((x / w) * Math.PI * 9) * 0.5 + 0.5;
+      const v = 16 + f * 30;
+      g.fillStyle = "rgba(" + v + "," + v + "," + (v + 7) + ",0.55)";
+      g.fillRect(x, 0, 1, h);
+    }
+    // 裾へ向かって暗くする
+    const dark = g.createLinearGradient(0, h * 0.45, 0, h);
+    dark.addColorStop(0, "rgba(0,0,0,0)");
+    dark.addColorStop(1, "rgba(0,0,0,0.72)");
+    g.fillStyle = dark; g.fillRect(0, 0, w, h);
+    // 黴と、乾いた染み
+    blotch(g, w, h, 22, 12, 70, "96,98,92", 0.05, 0.16);
+    blotch(g, w, h, 14, 10, 46, "8,8,10", 0.14, 0.34);
+    // ほつれ
+    g.strokeStyle = "rgba(120,120,126,0.14)"; g.lineWidth = 1;
+    for (let i = 0; i < 40; i++) {
+      const x = Math.random() * w, y = Math.random() * h;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 6, y + 8 + Math.random() * 26); g.stroke();
+    }
+    grain(g, w, h, 14);
+  }, 1, 1);
 }
 
 // 顔。髪のすきまから、かろうじて見えるもの

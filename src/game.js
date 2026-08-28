@@ -125,6 +125,19 @@ export class Game {
     // 手元のごくわずかな明かり（真っ暗で何も分からないのを防ぐ）
     this.near = new THREE.PointLight(0x8899bb, 1.6, 5.0, 1.8);
     this.scene.add(this.near);
+
+    // 「それ」だけは別の層（1）に置く。
+    // 懐中電灯は強すぎて、当てると何を置いても白く飛んでしまう。
+    // 追跡者には弱い専用の光だけを当て、距離で見え方が壊れないようにする。
+    this.camera.layers.enable(1);
+    this.amb.layers.enable(1);
+    // 手元の光は当てない（近づくと白く見えてしまうため）
+    this.torch.layers.set(0);
+    // 距離で減衰しない光にする。近づいても白く飛ばず、どこから見ても同じ姿になる
+    this.entityLight = new THREE.DirectionalLight(0xdde3ea, 0);
+    this.entityLight.layers.set(1);
+    this.scene.add(this.entityLight);
+    this.scene.add(this.entityLight.target);
   }
 
   _resize() {
@@ -379,6 +392,11 @@ export class Game {
     const weak = p.battery < 0.2 ? (0.55 + Math.sin(performance.now() * 0.02) * 0.15 * (0.2 - p.battery) * 5) : 1;
     this.torch.intensity += ((on ? 46 * weak : 0) - this.torch.intensity) * Math.min(1, dt * 12);
     this.torch.position.copy(this.camera.position);
+    // 「それ」を照らす光。見ている方向から、ほぼ一定の弱さで当てる
+    this.entityLight.position.copy(this.camera.position);
+    this.entityLight.position.y += 0.9;
+    this.entityLight.target.position.copy(this.torchTarget.position);
+    this.entityLight.intensity = on ? 1.15 : 0.42;
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     this.torchTarget.position.copy(this.camera.position).add(fwd.multiplyScalar(6));
     this.near.position.copy(this.camera.position);
