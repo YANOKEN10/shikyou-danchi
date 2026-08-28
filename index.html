@@ -214,6 +214,14 @@
     background: #171a20; border: 1px solid var(--line); border-radius: 3px; padding: 3px 7px; text-align: center;
   }
 
+  /* 音のたしかめ */
+  .sfxlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 14px; }
+  .sfxlist button.sfx {
+    margin: 0; padding: 10px 8px; font-size: 12.5px; text-align: left;
+    background: #12151a; border: 1px solid var(--line);
+  }
+  .sfxlist button.sfx::before { content: "▶ "; color: var(--accent); }
+
   /* 設定 */
   .opts { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
   label.chk { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--dim); cursor: pointer; }

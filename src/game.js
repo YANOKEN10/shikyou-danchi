@@ -41,6 +41,10 @@ export class Game {
     this.player.onLockChange = (locked) => {
       if (!locked && this.running && !this.ui.open) this.doPause();
     };
+    // 部屋の中を歩くと、ときどき床がきしむ
+    this.player.onStep = () => {
+      if (this.player.inUnit && !this.player.crouch && Math.random() < 0.22) this.snd.creakFloor();
+    };
 
     this.stalkers = new Stalkers(this.scene);
     this.appar = new Apparition(this.scene);
@@ -266,6 +270,9 @@ export class Game {
     this.eventsDone = new Set();
     this.apparT = 8 + Math.random() * 12;
     this.whisperT = 14 + Math.random() * 18;
+    this.gustT = 12 + Math.random() * 20;
+    this.popT = 10 + Math.random() * 18;
+    this.dripT = 0;
 
     this.snd.buzzOff();
     if (!def.lightsOut) this.snd.buzzOn(def.flicker ? 0.045 : 0.022);
@@ -335,6 +342,11 @@ export class Game {
         this.passT = 22 + Math.random() * 30;
         this.snd.passBy();
         if (Math.random() < 0.55) this.ui.say("……廊下を、誰かが通った。");
+      }
+      // 風呂の向こうの水滴
+      if (this.dripT > 0) {
+        this.dripT -= dt;
+        if (this.dripT <= 0) { this.snd.drip(); this.dripT = 4 + Math.random() * 7; }
       }
       // 扉がひとりでに閉まる
       if (this.slamT > 0) {
@@ -451,7 +463,8 @@ export class Game {
   _roomEnter(d) {
     this.snd.roomToneOn();
     const room = d.room || {};
-    if (room.scare === "water") this.snd.waterOn();
+    if (room.scare === "water") { this.snd.waterOn(); this.dripT = 3 + Math.random() * 4; }
+    if (room.kind === "tv") this.snd.crtOn();
 
     // 廊下を誰かが通る音（部屋にいるあいだ）
     this.passT = 9 + Math.random() * 14;
@@ -467,12 +480,22 @@ export class Game {
   _roomExit() {
     this.snd.roomToneOff();
     this.snd.waterOff();
+    this.snd.crtOff();
+    this.dripT = 0;
     this.slamT = 0;
     this.slamDoor = null;
   }
 
   // 部屋の中の「調べる」に付いているしかけ
   _detailScare(it) {
+    // まず、触ったものの音
+    const kind = this.curRoom && this.curRoom.room ? this.curRoom.room.kind : "";
+    if (kind === "boxes" || kind === "storage" || kind === "office" || kind === "child") this.snd.drawer();
+    else if (kind === "trash") this.snd.rustle();
+    else if (kind === "bath") this.snd.drip();
+    else if (kind === "mirrors") this.snd.mirrorRing();
+    else this.snd.paper();
+
     const s = it.scare;
     if (!s) return;
     if (s === "bulge") {
@@ -533,6 +556,7 @@ export class Game {
           if (f.t <= 0) {
             f.ph = 0.0001;
             f.t = 16 + Math.random() * 20;
+            this.snd.mirrorRing();
             this.snd.whisper();
           }
         }
@@ -622,6 +646,18 @@ export class Game {
           this.snd.whisper();
         }
       }
+    }
+
+    // 外廊下を抜ける風
+    this.gustT -= dt;
+    if (this.gustT <= 0) {
+      this.gustT = 28 + Math.random() * 40;
+      if (!this.player.inUnit) this.snd.gust();
+    }
+    // 切れかけの蛍光灯が、ときどき鳴る
+    if (def.flicker) {
+      this.popT -= dt;
+      if (this.popT <= 0) { this.popT = 14 + Math.random() * 26; this.snd.tubePop(); }
     }
 
     this.whisperT -= dt;
@@ -754,7 +790,7 @@ export class Game {
       if (this.state.flags.breaker) { this.ui.sayNow("もう入れてある。"); return; }
       this.state.flags.breaker = true;
       it.label = "調べる";
-      this.snd.click();
+      this.snd.switchFlip();
       setTimeout(() => {
         this.snd.thud(false);
         this.snd.buzzOn(0.05);
@@ -965,6 +1001,7 @@ export class Game {
         b.disabled = false; b.textContent = "いま記録する";
       });
       mk("持ち物とメモ", "ghost", () => { this.ui.closePause(); this._openBook(); });
+      mk("音のたしかめ", "ghost", () => this._soundPanel());
 
       // 音・操作
       const opt = document.createElement("div");
@@ -983,6 +1020,17 @@ export class Game {
       };
       chk("音を消す", this.snd.muted, (v) => this.snd.setMuted(v));
       chk("上下の視点を反転", this.player.invertY, (v) => { this.player.invertY = v; });
+
+      const vol = document.createElement("label");
+      vol.className = "rng";
+      vol.innerHTML = "<span>音の大きさ</span>";
+      const vi = document.createElement("input");
+      vi.type = "range"; vi.min = "0"; vi.max = "100";
+      vi.value = String(Math.round((this.snd.volume == null ? 1 : this.snd.volume) * 100));
+      vi.oninput = () => this.snd.setVolume(Number(vi.value) / 100);
+      vi.onchange = () => this.snd.step("walk", true);
+      vol.appendChild(vi);
+      opt.appendChild(vol);
 
       const sens = document.createElement("label");
       sens.className = "rng";
@@ -1040,6 +1088,61 @@ export class Game {
           b2.appendChild(no);
         });
       });
+    });
+  }
+
+  // 効果音をひとつずつ鳴らして確かめる
+  _soundPanel() {
+    this.doPause((body) => {
+      const t = document.createElement("h3");
+      t.textContent = "音のたしかめ";
+      body.appendChild(t);
+
+      const p = document.createElement("p");
+      p.className = "dim";
+      p.textContent = "このゲームの音は、録音ではなく、その場で作っています。押すと鳴ります。";
+      body.appendChild(p);
+
+      if (!this.snd.ready) {
+        const w = document.createElement("p");
+        w.className = "warn";
+        w.textContent = "まだ音を出せていません。いちど画面をさわってから、もう一度開いてください。";
+        body.appendChild(w);
+      }
+
+      const vol = document.createElement("label");
+      vol.className = "rng";
+      vol.innerHTML = "<span>音の大きさ</span>";
+      const vi = document.createElement("input");
+      vi.type = "range"; vi.min = "0"; vi.max = "100";
+      vi.value = String(Math.round((this.snd.volume == null ? 1 : this.snd.volume) * 100));
+      vi.oninput = () => this.snd.setVolume(Number(vi.value) / 100);
+      vol.appendChild(vi);
+      body.appendChild(vol);
+
+      const grid = document.createElement("div");
+      grid.className = "sfxlist";
+      this.snd.catalog().forEach(([name, play]) => {
+        const b = document.createElement("button");
+        b.className = "sfx";
+        b.textContent = name;
+        b.onclick = () => { this.snd.unlock(); play(); };
+        grid.appendChild(b);
+      });
+      body.appendChild(grid);
+
+      const note = document.createElement("p");
+      note.className = "dim";
+      note.textContent = "音が出ないときは、端末の音量と、iPhone のマナーモード（消音スイッチ）を確かめてください。";
+      body.appendChild(note);
+
+      const hr = document.createElement("hr");
+      body.appendChild(hr);
+      const back = document.createElement("button");
+      back.className = "big";
+      back.textContent = "戻る";
+      back.onclick = () => { this.snd.ui(); this.ui.closePause(); this.doPause(); };
+      body.appendChild(back);
     });
   }
 
