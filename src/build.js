@@ -212,8 +212,9 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
 
   /* --- 部屋の中のもの（拾う・読む） --- */
   if (unit.item) {
+    const at = C.itemAt || [x0 + 1.0, z0 - 0.9];
     inter.push({
-      x: x0 + 1.0, y: 0.95, z: z0 - 0.9, r: 1.2,
+      x: at[0], y: 0.95, z: at[1], r: 1.35,
       kind: "item", id: unit.item, label: "手に取る", once: true, note: unit.note,
     });
   }
@@ -306,6 +307,9 @@ const FURNISH = {
     // 靴箱
     C.pb(0.9, 0.75, 0.35, mats.wood, x1 - 0.6, 0.38, z0 - 2.5);
     C.blk(x1 - 1.1, z0 - 2.7, x1 - 0.1, z0 - 2.3);
+    // 靴箱の上。ここに懐中電灯や鍵を置きます
+    C.itemAt = [x1 - 0.6, z0 - 2.05];
+    C.pb(0.07, 0.07, 0.2, mats.steel, x1 - 0.6, 0.79, z0 - 2.5);
     // 押し入れ
     C.pb(1.8, H, 0.5, mats.wood, x1 - 1.1, H / 2, z1 + 0.26);
     C.blk(x1 - 2.0, z1, x1 - 0.2, z1 + 0.5);
@@ -548,6 +552,7 @@ const FURNISH = {
     C.pb(0.05, 0.42, 0.05, mats.wood, x1 - 1.05, 0.22, z1 + 1.75);
     // 貼り紙
     C.wall(0.42, 0.52, mats.notice, x1 - 0.05, 1.6, z1 + 1.2, -Math.PI / 2);
+    C.itemAt = [x0 + 1.1, z1 + 0.95];
     C.pb(1.7, 0.6, 0.35, mats.wood, x0 + 1.0, 1.72, C.z0 - 0.75);
     lowTable(C, dx, zMid - 1.4);
     C.detailAt = [x0 + 1.1, z1 + 0.95];
@@ -1040,52 +1045,126 @@ export function buildFloor(scene, floorDef, opt) {
 
 /* ---------- 追跡者 ---------- */
 
+//  背が高く、細く、足が見えない。裾を引きずって滑るように寄ってくる。
+//  顔はほとんど髪で隠れていて、光が当たったときだけ見える。
 export function buildEntity() {
   const g = new THREE.Group();
-  const dark = new THREE.MeshLambertMaterial({ color: 0x07080a });
-  const darker = new THREE.MeshLambertMaterial({ color: 0x030405 });
+  const H = 1.92;                 // 見上げる高さ
 
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.62, 4, 10), dark);
-  torso.position.y = 1.16;
-  g.add(torso);
+  const cloth = new THREE.MeshLambertMaterial({ color: 0x090909 });
+  const clothDark = new THREE.MeshLambertMaterial({ color: 0x050507 });
+  // 懐中電灯を至近で当てても白く飛ばない暗さにする。顔は下の絵で見せる
+  const skin = new THREE.MeshLambertMaterial({ color: 0x1e1d1b });
+  const pale = new THREE.MeshLambertMaterial({ color: 0x54514c });
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 14, 12), darker);
-  head.position.y = 1.66;
-  head.scale.set(1, 1.22, 0.9);
-  g.add(head);
+  // 胴。肩から裾へ、まっすぐ広がる長い衣
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.33, H * 0.78, 14, 1, true), cloth);
+  body.position.y = H * 0.39;
+  g.add(body);
+  // 裾（床すれすれ。足は見えない）
+  const hem = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.40, 0.16, 14, 1, true), clothDark);
+  hem.position.y = 0.07;
+  g.add(hem);
+  // 床との境を黒でふさぐ
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.40, 14), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.012;
+  g.add(shadow);
 
-  const limbs = [];
-  const mkLimb = (x, y, len, r) => {
-    const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 3, 8), dark);
-    m.position.set(x, y, 0);
-    g.add(m);
-    limbs.push(m);
-    return m;
+  // 肩から先。腕は長すぎて、膝の下まで垂れている
+  const arms = [];
+  [-1, 1].forEach((s) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(s * 0.255, H * 0.755, 0.03);
+    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.033, 0.52, 3, 7), cloth);
+    upper.position.y = -0.28;
+    const fore = new THREE.Mesh(new THREE.CapsuleGeometry(0.026, 0.46, 3, 7), cloth);
+    fore.position.y = -0.76;
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 7), pale);
+    hand.scale.set(0.7, 1.7, 0.45);
+    hand.position.y = -1.03;
+    pivot.add(upper, fore, hand);
+    g.add(pivot);
+    arms.push(pivot);
+  });
+  // なで肩の輪郭
+  const shoulder = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.64, 8), cloth);
+  shoulder.rotation.z = Math.PI / 2;
+  shoulder.position.y = H * 0.755;
+  g.add(shoulder);
+
+  // 首と頭
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.14, 8), skin);
+  neck.position.y = H * 0.845;
+  g.add(neck);
+
+  const headPivot = new THREE.Group();
+  headPivot.position.y = H * 0.90;
+  g.add(headPivot);
+
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 12), skin);
+  skull.scale.set(1, 1.18, 0.95);
+  headPivot.add(skull);
+
+  // 顔。暗くても、うっすら見えるように光らせておく
+  const faceMat = new THREE.MeshBasicMaterial({
+    map: TX.face(), transparent: true, opacity: 0.72, depthWrite: false,
+  });
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.21, 0.27), faceMat);
+  face.position.set(0, -0.012, 0.112);
+  headPivot.add(face);
+
+  // 髪。頭から胸の下まで、房になって垂れる
+  const hairMat = new THREE.MeshLambertMaterial({
+    map: TX.hair(), transparent: true, side: THREE.DoubleSide, depthWrite: false,
+  });
+  const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.139, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.88), hairMat);
+  hairTop.scale.set(1.03, 1.22, 1.03);
+  headPivot.add(hairTop);
+
+  const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.137, 0.21, 0.68, 16, 1, true), hairMat);
+  veil.position.y = -0.32;
+  headPivot.add(veil);
+
+  // 前髪。顔をほとんど覆う
+  const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.20), hairMat);
+  bang.position.set(0, 0.045, 0.129);
+  headPivot.add(bang);
+
+  g.userData = {
+    body, hem, arms, headPivot, face: faceMat, veil,
+    phase: Math.random() * 6, twitch: 2 + Math.random() * 4, tilt: 0, H,
   };
-  const armL = mkLimb(-0.26, 1.02, 0.66, 0.055);
-  const armR = mkLimb(0.26, 1.02, 0.66, 0.055);
-  const legL = mkLimb(-0.11, 0.42, 0.74, 0.07);
-  const legR = mkLimb(0.11, 0.42, 0.74, 0.07);
-
-  // 髪のような、輪郭をぼかすもの
-  const hair = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.55, 10, 1, true), darker);
-  hair.position.set(0, 1.52, 0.02);
-  g.add(hair);
-
-  g.userData = { torso, head, armL, armR, legL, legR, hair, phase: 0 };
   return g;
 }
 
 export function animateEntity(ent, dt, moving) {
   const u = ent.userData;
-  u.phase += dt * (moving ? 6.2 : 1.1);
+  u.phase += dt * (moving ? 2.6 : 0.8);
+
+  // 足を動かさない。裾ごと、すべるように運ぶ
   const s = Math.sin(u.phase);
-  u.legL.rotation.x = s * (moving ? 0.55 : 0.03);
-  u.legR.rotation.x = -s * (moving ? 0.55 : 0.03);
-  u.armL.rotation.x = -s * (moving ? 0.35 : 0.05);
-  u.armR.rotation.x = s * (moving ? 0.35 : 0.05);
-  u.head.rotation.z = Math.sin(u.phase * 0.31) * 0.08;
-  u.torso.position.y = 1.16 + Math.abs(s) * (moving ? 0.025 : 0.006);
+  ent.position.y = Math.abs(Math.sin(u.phase * 1.7)) * (moving ? 0.022 : 0.006);
+  u.hem.rotation.z = s * (moving ? 0.05 : 0.012);
+  u.body.rotation.z = s * (moving ? 0.022 : 0.006);
+
+  // 腕は、ゆっくり前後に振れるだけ
+  u.arms[0].rotation.x = s * (moving ? 0.16 : 0.03);
+  u.arms[1].rotation.x = -s * (moving ? 0.16 : 0.03);
+  u.arms[0].rotation.z = 0.05 + s * 0.02;
+  u.arms[1].rotation.z = -0.05 - s * 0.02;
+
+  // 首は、たまに変な角度へ「かくん」と落ちる
+  u.twitch -= dt;
+  if (u.twitch <= 0) {
+    u.twitch = 3 + Math.random() * 7;
+    u.tilt = (Math.random() - 0.5) * 1.15;
+  }
+  u.headPivot.rotation.z += (u.tilt - u.headPivot.rotation.z) * Math.min(1, dt * 14);
+  u.headPivot.rotation.x = Math.sin(u.phase * 0.37) * 0.06;
+
+  // 髪の房が、わずかに遅れて揺れる
+  u.veil.rotation.z = -u.headPivot.rotation.z * 0.35 + s * 0.03;
 }
 
 /* ---------- 片づけ ---------- */

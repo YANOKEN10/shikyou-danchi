@@ -45,6 +45,12 @@ export class Game {
     this.player.onStep = () => {
       if (this.player.inUnit && !this.player.crouch && Math.random() < 0.22) this.snd.creakFloor();
     };
+    // 「灯」を押したのに点かないとき、理由を出す
+    this.player.onLightFail = (why) => {
+      if (why === "none") this.ui.sayNow("懐中電灯を持っていない。一〇一号室の玄関に置いたままだ。");
+      else if (why === "empty") this.ui.sayNow("電池が切れている。予備を探すしかない。");
+      else if (why === "swap") this.ui.sayNow("電池を入れ替えた。");
+    };
 
     this.stalkers = new Stalkers(this.scene);
     this.appar = new Apparition(this.scene);
@@ -683,7 +689,9 @@ export class Game {
       if (d > it.r) continue;
       const dot = d < 0.01 ? 1 : (dx / d) * fwd.x + (dz / d) * fwd.z;
       if (dot < 0.15) continue;
-      const score = dot * 2 - d * 0.3;
+      // 拾うもの・読むものは、ただの「調べる」より先に拾わせる
+      const pri = it.kind === "detail" ? -0.5 : 0;
+      const score = dot * 2 - d * 0.3 + pri;
       if (score > bestScore) { bestScore = score; best = it; }
     }
     return best;

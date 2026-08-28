@@ -214,10 +214,24 @@ export class Player {
   /* ---------- 懐中電灯 ---------- */
 
   toggleLight() {
-    if (!this.hasLight || this.frozen) return;
+    if (this.frozen) return;
+
+    // まだ持っていない／電池が切れている、を黙って無視しない
+    if (!this.hasLight) {
+      this.snd.click();
+      if (this.onLightFail) this.onLightFail("none");
+      return;
+    }
     if (!this.lightOn && this.battery <= 0.001) {
-      if (this.spare > 0) { this.spare--; this.battery = 1; }
-      else { this.snd.click(); return; }
+      if (this.spare > 0) {
+        this.spare--;
+        this.battery = 1;
+        if (this.onLightFail) this.onLightFail("swap");
+      } else {
+        this.snd.click();
+        if (this.onLightFail) this.onLightFail("empty");
+        return;
+      }
     }
     this.lightOn = !this.lightOn;
     this.snd.click();

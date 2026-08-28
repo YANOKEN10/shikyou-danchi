@@ -471,6 +471,75 @@ export function scribble() {
   return t;
 }
 
+// 長い髪（房のすきまが透ける）
+export function hair() {
+  const key = "hair";
+  if (cache.has(key)) return cache.get(key);
+  const c = cv(256, 512);
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, 256, 512);
+  // 頭のあたりは隙間なく、下へ行くほど房に分かれる
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random() * 256;
+    const len = 150 + Math.random() * 350;
+    const w = 2 + Math.random() * 9;
+    const grd = g.createLinearGradient(0, 0, 0, len);
+    grd.addColorStop(0, "rgba(8,8,10,1)");
+    grd.addColorStop(0.72, "rgba(10,10,13,0.95)");
+    grd.addColorStop(1, "rgba(12,12,15,0)");
+    g.fillStyle = grd;
+    g.save();
+    g.translate(x, 0);
+    g.rotate((Math.random() - 0.5) * 0.10);
+    g.fillRect(-w / 2, 0, w, len);
+    g.restore();
+  }
+  // てっぺんは必ず塞ぐ
+  g.fillStyle = "rgba(8,8,10,1)";
+  g.fillRect(0, 0, 256, 120);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t);
+  return t;
+}
+
+// 顔。髪のすきまから、かろうじて見えるもの
+export function face() {
+  const key = "face";
+  if (cache.has(key)) return cache.get(key);
+  const c = cv(128, 160);
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, 128, 160);
+  // 血の気のない肌
+  const skin = g.createRadialGradient(64, 74, 6, 64, 80, 62);
+  skin.addColorStop(0, "rgba(196,192,186,1)");
+  skin.addColorStop(0.75, "rgba(150,148,146,0.95)");
+  skin.addColorStop(1, "rgba(96,96,98,0)");
+  g.fillStyle = skin;
+  g.beginPath(); g.ellipse(64, 80, 40, 54, 0, 0, 7); g.fill();
+  // 落ちくぼんだ目
+  ["-", "+"].forEach((s, i) => {
+    const x = i === 0 ? 48 : 80;
+    const hole = g.createRadialGradient(x, 72, 1, x, 72, 15);
+    hole.addColorStop(0, "rgba(2,2,4,1)");
+    hole.addColorStop(0.6, "rgba(4,4,6,0.9)");
+    hole.addColorStop(1, "rgba(20,20,24,0)");
+    g.fillStyle = hole;
+    g.beginPath(); g.ellipse(x, 73, 11, 14, 0, 0, 7); g.fill();
+  });
+  // うっすら開いた口
+  g.fillStyle = "rgba(6,6,9,0.85)";
+  g.beginPath(); g.ellipse(64, 112, 7, 12, 0, 0, 7); g.fill();
+  // 頬のくぼみ
+  g.fillStyle = "rgba(40,40,44,0.30)";
+  g.beginPath(); g.ellipse(40, 96, 12, 20, 0.3, 0, 7); g.fill();
+  g.beginPath(); g.ellipse(88, 96, 12, 20, -0.3, 0, 7); g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t);
+  return t;
+}
+
 // 鏡にうつるもの（うすい人影。背景は透ける）
 export function figure() {
   const key = "figure";

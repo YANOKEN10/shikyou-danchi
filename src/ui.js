@@ -79,6 +79,9 @@ export class UI {
     this.el.bat.style.display = has ? "" : "none";
     this.el.batFill.style.width = Math.max(0, Math.min(1, v)) * 100 + "%";
     this.el.batFill.classList.toggle("low", v < 0.25);
+    // 「灯」ボタン。まだ持っていない／電池切れは、見て分かるようにする
+    const b = document.getElementById("bLight");
+    if (b) b.classList.toggle("off", !has || v <= 0.001);
   }
 
   setStamina(v) {
