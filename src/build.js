@@ -1045,6 +1045,74 @@ export function buildFloor(scene, floorDef, opt) {
 
 /* ---------- 追跡者 ---------- */
 
+/* ---------- 引きずる裾 ---------- */
+//  真円で床に接していると「置物」に見えるので、房ごとに長さと高さを変え、
+//  さらに毎フレーム揺らして、進む向きの後ろへ流れるようにします。
+
+const HEM_N = 26;
+
+function buildHem(mat, r0, y0) {
+  const base = [];
+  for (let i = 0; i < HEM_N; i++) {
+    base.push({
+      r: 0.30 + Math.random() * 0.24,        // 広がりの深さ
+      y: Math.random() * Math.random() * 0.11, // ほとんどは床すれすれ、たまに浮く
+      ph: Math.random() * 6.283,             // 揺れの位相
+      sp: 0.5 + Math.random() * 1.3,         // 揺れの速さ
+    });
+  }
+  const pos = new Float32Array(HEM_N * 2 * 3);
+  const idx = [];
+  for (let i = 0; i < HEM_N; i++) {
+    const j = (i + 1) % HEM_N;
+    idx.push(i * 2, i * 2 + 1, j * 2 + 1, i * 2, j * 2 + 1, j * 2);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  const m = new THREE.Mesh(geo, mat);
+  m.userData = { base, pos, geo, r0, y0 };
+  animateHem(m, 0, 0);
+  return m;
+}
+
+function animateHem(mesh, t, drag) {
+  const u = mesh.userData, p = u.pos;
+  for (let i = 0; i < HEM_N; i++) {
+    const a = (i / HEM_N) * Math.PI * 2;
+    const c = Math.cos(a), s = Math.sin(a);
+    // 内側（腰のところ）は動かさない
+    p[i * 6] = c * u.r0; p[i * 6 + 1] = u.y0; p[i * 6 + 2] = s * u.r0;
+    // 外側（床のあたり）
+    const b = u.base[i];
+    const w = Math.sin(t * b.sp + b.ph);
+    const front = s * drag;                    // 進む向き＝手前(+z)
+    const r = Math.max(0.16, b.r + w * 0.038 - front * 0.09);
+    const y = Math.max(0, b.y + w * 0.022 - front * 0.03);
+    p[i * 6 + 3] = c * r; p[i * 6 + 4] = y; p[i * 6 + 5] = s * r;
+  }
+  u.geo.attributes.position.needsUpdate = true;
+  u.geo.computeVertexNormals();
+}
+
+// 裾と同じ形の、平たい影
+function buildBlob(mat, base, scale) {
+  const pos = new Float32Array((HEM_N + 1) * 3);
+  const idx = [];
+  for (let i = 0; i < HEM_N; i++) {
+    const a = (i / HEM_N) * Math.PI * 2;
+    pos[(i + 1) * 3] = Math.cos(a) * base[i].r * scale;
+    pos[(i + 1) * 3 + 2] = Math.sin(a) * base[i].r * scale;
+    idx.push(0, i + 1, ((i + 1) % HEM_N) + 1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  const m = new THREE.Mesh(geo, mat);
+  m.rotation.x = 0;
+  return m;
+}
+
 //  背が高く、細く、足が見えない。裾を引きずって滑るように寄ってくる。
 //  顔はほとんど髪で隠れていて、光が当たったときだけ見える。
 export function buildEntity() {
@@ -1054,25 +1122,26 @@ export function buildEntity() {
   const cloth = new THREE.MeshLambertMaterial({ map: TX.shroud(), color: 0xe8e8f0 });
   const clothDark = new THREE.MeshLambertMaterial({ color: 0x131318 });
   // 懐中電灯を至近で当てても白く飛ばない暗さにする。顔は下の絵で見せる
-  const skin = new THREE.MeshLambertMaterial({ color: 0x4c453d });
+  const skin = new THREE.MeshLambertMaterial({ color: 0x171512 });   // 頭は暗く。顔は下の絵で見せる
   const pale = new THREE.MeshLambertMaterial({ color: 0x857f74 });
 
   // 胴。肩から裾へ、まっすぐ広がる長い衣
+  // 胴。裾は床まで下ろさず、下は別に作った不規則な裾でつなぐ
   const prof = [
-    [0.40, 0.00], [0.38, 0.09], [0.31, 0.42], [0.27, 0.74],
-    [0.225, 1.02], [0.205, 1.22], [0.225, 1.36], [0.215, 1.48],
+    [0.335, 0.20], [0.315, 0.40], [0.285, 0.66],
+    [0.235, 1.00], [0.205, 1.22], [0.225, 1.36], [0.215, 1.48],
     [0.155, 1.58], [0.075, 1.64],
   ].map(([r, y]) => new THREE.Vector2(r, y));
-  const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 20), cloth);
+  const body = new THREE.Mesh(new THREE.LatheGeometry(prof, HEM_N), cloth);
   g.add(body);
-  // 裾（床すれすれ。足は見えない）
-  const hem = new THREE.Mesh(new THREE.CylinderGeometry(0.40, 0.44, 0.05, 20, 1, true), clothDark);
-  hem.position.y = 0.025;
+
+  // 裾。円ではなく、房ごとに長さも高さも違う。歩くと後ろへ流れる
+  const hem = buildHem(clothDark, 0.335, 0.20);
   g.add(hem);
-  // 床との境を黒でふさぐ
-  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.44, 20), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = 0.012;
+
+  // 床の影。これも円にしない
+  const shadow = buildBlob(new THREE.MeshBasicMaterial({ color: 0x000000 }), hem.userData.base, 0.86);
+  shadow.position.y = 0.011;
   g.add(shadow);
 
   // 肩から先。腕は長すぎて、膝の下まで垂れている
@@ -1108,15 +1177,15 @@ export function buildEntity() {
 
   // 顔。暗くても、うっすら見えるように光らせておく
   const faceMat = new THREE.MeshBasicMaterial({
-    map: TX.face(), transparent: true, opacity: 0.8, depthWrite: false,
+    map: TX.face(), transparent: true, opacity: 0.88, depthWrite: false,
   });
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.20, 0.26), faceMat);
-  face.position.set(0, -0.018, 0.150);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.235, 0.29), faceMat);
+  face.position.set(0, -0.022, 0.152);
   headPivot.add(face);
 
   // 髪。頭から胸の下まで、房になって垂れる
   const hairMat = new THREE.MeshLambertMaterial({
-    map: TX.hair(), color: 0x585862, transparent: true, side: THREE.FrontSide, depthWrite: false,
+    map: TX.hair(), color: 0x32323b, transparent: true, side: THREE.FrontSide, depthWrite: false,
   });
   const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.139, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.88), hairMat);
   hairTop.scale.set(1.03, 1.22, 1.03);
@@ -1127,16 +1196,21 @@ export function buildEntity() {
   headPivot.add(veil);
 
   // 前髪。顔をほとんど覆う
-  const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.19), hairMat);
-  bang.position.set(0, 0.052, 0.163);
+  // 顔の前に垂れる髪。これがないと、顔がお面に見えてしまう
+  const bangMat = new THREE.MeshLambertMaterial({
+    map: TX.hairFront(), color: 0x4a4a55, transparent: true, side: THREE.FrontSide, depthWrite: false,
+  });
+  const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.295, 0.37), bangMat);
+  bang.position.set(0, -0.085, 0.168);
   headPivot.add(bang);
 
   // この一体だけ、別の層で照らす（懐中電灯で白飛びさせないため）
   g.traverse((o) => o.layers.set(1));
 
   g.userData = {
-    body, hem, arms, headPivot, face: faceMat, veil,
+    body, hem, shadow, arms, headPivot, face: faceMat, veil,
     phase: Math.random() * 6, twitch: 2 + Math.random() * 4, tilt: 0, H,
+    hemT: Math.random() * 10,
   };
   return g;
 }
@@ -1194,8 +1268,11 @@ export function animateEntity(ent, dt, moving) {
   // 足を動かさない。裾ごと、すべるように運ぶ
   const s = Math.sin(u.phase);
   ent.position.y = Math.abs(Math.sin(u.phase * 1.7)) * (moving ? 0.022 : 0.006);
-  u.hem.rotation.z = s * (moving ? 0.05 : 0.012);
   u.body.rotation.z = s * (moving ? 0.022 : 0.006);
+
+  // 裾。歩いているときほど後ろへ流れ、房ごとにばらばらに揺れる
+  u.hemT += dt * (moving ? 2.4 : 0.9);
+  animateHem(u.hem, u.hemT, moving ? 1 : 0.18);
 
   // 腕は、ゆっくり前後に振れるだけ
   u.arms[0].rotation.x = s * (moving ? 0.16 : 0.03);

@@ -555,37 +555,198 @@ export function shroud() {
   }, 1, 1);
 }
 
+// 顔の前に垂れる髪。房だけ。板の四角が出ないよう、ふちは消す
+export function hairFront() {
+  const key = "hairFront";
+  if (cache.has(key)) return cache.get(key);
+  const W = 256, H = 320;
+  const c = cv(W, H);
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, W, H);
+
+  // 房を、長さも太さもばらばらに垂らす
+  for (let i = 0; i < 46; i++) {
+    const x = Math.random() * W;
+    const len = 70 + Math.random() * 250;
+    const w = 3 + Math.random() * 11;
+    const lean = (Math.random() - 0.5) * 26;
+    const v = 30 + Math.random() * 22;
+    const grd = g.createLinearGradient(0, 0, 0, len);
+    grd.addColorStop(0, "rgba(" + v + "," + v + "," + (v + 6) + ",1)");
+    grd.addColorStop(0.7, "rgba(" + (v - 10) + "," + (v - 10) + "," + (v - 4) + ",0.9)");
+    grd.addColorStop(1, "rgba(10,10,14,0)");
+    g.fillStyle = grd;
+    g.beginPath();
+    g.moveTo(x - w / 2, 0);
+    g.lineTo(x + w / 2, 0);
+    g.lineTo(x + lean + w * 0.15, len);
+    g.lineTo(x + lean - w * 0.15, len);
+    g.closePath();
+    g.fill();
+  }
+  // 生え際は、でこぼこに詰める（まっすぐだと板の四角が出る）
+  g.fillStyle = "rgba(36,36,42,0.9)";
+  g.beginPath();
+  g.moveTo(0, 0); g.lineTo(W, 0);
+  for (let x = W; x >= 0; x -= 12) g.lineTo(x, 10 + Math.random() * 22);
+  g.closePath(); g.fill();
+
+  // ふちを消して、板の四角が出ないようにする
+  g.globalCompositeOperation = "destination-out";
+  const side = g.createLinearGradient(0, 0, W, 0);
+  side.addColorStop(0, "rgba(0,0,0,1)");
+  side.addColorStop(0.16, "rgba(0,0,0,0)");
+  side.addColorStop(0.84, "rgba(0,0,0,0)");
+  side.addColorStop(1, "rgba(0,0,0,1)");
+  g.fillStyle = side; g.fillRect(0, 0, W, H);
+  const bot = g.createLinearGradient(0, H * 0.58, 0, H);
+  bot.addColorStop(0, "rgba(0,0,0,0)");
+  bot.addColorStop(1, "rgba(0,0,0,1)");
+  g.fillStyle = bot; g.fillRect(0, 0, W, H);
+  const top = g.createLinearGradient(0, 0, 0, 30);
+  top.addColorStop(0, "rgba(0,0,0,0.85)");
+  top.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = top; g.fillRect(0, 0, W, 30);
+  g.globalCompositeOperation = "source-over";
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t);
+  return t;
+}
+
 // 顔。髪のすきまから、かろうじて見えるもの
+// 顔。参考写真の特徴（見開いた白目・皮膚のひび割れ・半開きの口）を
+// 描き起こしたもの。廊下の暗さの中では、顔は30〜80画素ほどにしかならない。
+// そこで読めるのは「蒼白い面」「二つの闇」「開いた口」の三つだけなので、
+// 細部より明暗の差を優先しています。
 export function face() {
   const key = "face";
   if (cache.has(key)) return cache.get(key);
-  const c = cv(128, 160);
+  const S = 256, H = 340;
+  const c = cv(S, H);
   const g = c.getContext("2d");
-  g.clearRect(0, 0, 128, 160);
-  // 血の気のない肌
-  const skin = g.createRadialGradient(64, 74, 6, 64, 80, 62);
-  skin.addColorStop(0, "rgba(196,192,186,1)");
-  skin.addColorStop(0.75, "rgba(150,148,146,0.95)");
-  skin.addColorStop(1, "rgba(96,96,98,0)");
+  g.clearRect(0, 0, S, H);
+
+  const cx = S / 2, cy = H * 0.47;
+  const FW = 76;
+  const EY = cy - 20, EX = 31;
+
+  const smudge = (x, y, w, h, a, col, op) => {
+    const q = g.createRadialGradient(x, y, 1, x, y, Math.max(w, h));
+    q.addColorStop(0, "rgba(" + col + "," + op + ")");
+    q.addColorStop(0.55, "rgba(" + col + "," + (op * 0.72).toFixed(3) + ")");
+    q.addColorStop(1, "rgba(" + col + ",0)");
+    g.fillStyle = q;
+    g.save(); g.translate(x, y); g.rotate(a);
+    g.beginPath(); g.ellipse(0, 0, w, h, 0, 0, 7); g.fill();
+    g.restore();
+  };
+
+  /* --- 面。中央だけ明るく、ふちは闇へ落とす --- */
+  const skin = g.createRadialGradient(cx, cy - 26, 8, cx, cy + 4, 118);
+  skin.addColorStop(0, "rgba(206,202,196,1)");
+  skin.addColorStop(0.38, "rgba(176,172,166,1)");
+  skin.addColorStop(0.68, "rgba(104,101,98,0.94)");
+  skin.addColorStop(0.87, "rgba(44,44,46,0.6)");
+  skin.addColorStop(1, "rgba(16,16,18,0)");
   g.fillStyle = skin;
-  g.beginPath(); g.ellipse(64, 80, 40, 54, 0, 0, 7); g.fill();
-  // 落ちくぼんだ目
-  ["-", "+"].forEach((s, i) => {
-    const x = i === 0 ? 48 : 80;
-    const hole = g.createRadialGradient(x, 72, 1, x, 72, 15);
-    hole.addColorStop(0, "rgba(2,2,4,1)");
-    hole.addColorStop(0.6, "rgba(4,4,6,0.9)");
-    hole.addColorStop(1, "rgba(20,20,24,0)");
-    g.fillStyle = hole;
-    g.beginPath(); g.ellipse(x, 73, 11, 14, 0, 0, 7); g.fill();
-  });
-  // うっすら開いた口
-  g.fillStyle = "rgba(6,6,9,0.85)";
-  g.beginPath(); g.ellipse(64, 112, 7, 12, 0, 0, 7); g.fill();
-  // 頬のくぼみ
-  g.fillStyle = "rgba(40,40,44,0.30)";
-  g.beginPath(); g.ellipse(40, 96, 12, 20, 0.3, 0, 7); g.fill();
-  g.beginPath(); g.ellipse(88, 96, 12, 20, -0.3, 0, 7); g.fill();
+  g.beginPath(); g.ellipse(cx, cy + 8, FW, 112, 0, 0, 7); g.fill();
+
+  // 頬骨の上だけ、さらに明るく
+  smudge(cx - 40, cy + 8, 26, 20, 0.2, "228,224,218", 0.22);
+  smudge(cx + 40, cy + 6, 26, 20, -0.2, "228,224,218", 0.22);
+  smudge(cx, cy - 66, 40, 22, 0, "228,224,218", 0.20);
+
+  // こけた頬・こめかみ・あご
+  smudge(cx - 52, cy + 34, 26, 40, 0.22, "6,6,10", 0.62);
+  smudge(cx + 52, cy + 34, 26, 40, -0.22, "6,6,10", 0.62);
+  smudge(cx - 62, cy - 40, 20, 28, 0, "6,6,10", 0.55);
+  smudge(cx + 62, cy - 40, 20, 28, 0, "6,6,10", 0.55);
+  smudge(cx, cy + 100, 34, 18, 0, "6,6,10", 0.5);
+
+  /* --- 目。遠目には「二つの闇」、近づくと見開いた白目 --- */
+  const eye = (ex, ey, w, h, look, drop) => {
+    smudge(ex, ey + 3, w * 2.6, h * 3.0, 0, "0,0,0", 0.9);       // 落ちくぼみ
+    smudge(ex, ey + h * 2.0, w * 1.7, h * 1.3, 0, "0,0,0", 0.5);  // 隈
+
+    g.save();
+    g.beginPath(); g.ellipse(ex, ey, w, h, 0, 0, 7); g.clip();
+    g.fillStyle = "rgba(196,194,188,0.97)";
+    g.fillRect(ex - w, ey - h, w * 2, h * 2);
+    g.fillStyle = "rgba(28,28,32,0.97)";
+    g.beginPath(); g.arc(ex + look, ey + 1.5, w * 0.44, 0, 7); g.fill();
+    g.fillStyle = "rgba(0,0,0,1)";
+    g.beginPath(); g.arc(ex + look, ey + 1.5, w * 0.20, 0, 7); g.fill();
+    g.fillStyle = "rgba(4,4,8,0.9)";
+    g.beginPath(); g.ellipse(ex, ey - h * (0.55 + drop), w * 1.35, h, 0, 0, 7); g.fill();
+    g.restore();
+
+    g.strokeStyle = "rgba(3,3,6,0.85)"; g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(ex - w * 1.05, ey - h * 0.1);
+    g.quadraticCurveTo(ex, ey - h * 1.25, ex + w * 1.05, ey - h * 0.16);
+    g.stroke();
+    g.fillStyle = "rgba(240,240,236,0.6)";
+    g.beginPath(); g.arc(ex + look - w * 0.22, ey - h * 0.32, 1.9, 0, 7); g.fill();
+  };
+  eye(cx - EX, EY, 13.5, 9.5, 1.8, 0.06);
+  eye(cx + EX + 1, EY - 3, 12.5, 10.5, -1.4, 0.0);
+
+  // 眉
+  g.strokeStyle = "rgba(6,6,10,0.75)"; g.lineWidth = 3.6; g.lineCap = "round";
+  g.beginPath(); g.moveTo(cx - EX - 16, EY - 22); g.quadraticCurveTo(cx - EX, EY - 29, cx - EX + 15, EY - 22); g.stroke();
+  g.beginPath(); g.moveTo(cx + EX - 14, EY - 26); g.quadraticCurveTo(cx + EX + 2, EY - 32, cx + EX + 16, EY - 23); g.stroke();
+
+  /* --- 鼻 --- */
+  g.fillStyle = "rgba(226,222,216,0.26)";
+  g.beginPath(); g.ellipse(cx - 1, cy + 6, 6.5, 30, 0, 0, 7); g.fill();
+  smudge(cx - 14, cy + 12, 10, 26, 0, "6,6,10", 0.5);
+  smudge(cx + 13, cy + 12, 10, 26, 0, "6,6,10", 0.5);
+  g.fillStyle = "rgba(2,2,5,0.8)";
+  g.beginPath(); g.ellipse(cx - 7.5, cy + 36, 5, 3.6, 0.25, 0, 7); g.fill();
+  g.beginPath(); g.ellipse(cx + 7.5, cy + 36, 5, 3.6, -0.25, 0, 7); g.fill();
+
+  /* --- 口。大きく、暗く、ゆがんで --- */
+  smudge(cx, cy + 70, 34, 26, 0, "0,0,0", 0.55);
+  g.fillStyle = "rgba(0,0,0,0.97)";
+  g.beginPath();
+  g.moveTo(cx - 21, cy + 56);
+  g.quadraticCurveTo(cx - 2, cy + 48, cx + 20, cy + 58);
+  g.quadraticCurveTo(cx + 17, cy + 88, cx - 3, cy + 94);
+  g.quadraticCurveTo(cx - 19, cy + 86, cx - 21, cy + 56);
+  g.closePath(); g.fill();
+  g.fillStyle = "rgba(168,164,158,0.4)";
+  g.beginPath(); g.ellipse(cx - 1, cy + 100, 15, 5, 0, 0, 7); g.fill();
+
+  /* --- ひび割れ --- */
+  const crack = (x0, y0, dir, len, w, depth) => {
+    g.strokeStyle = "rgba(4,4,7," + (0.42 + w * 0.16).toFixed(2) + ")";
+    g.lineWidth = w;
+    g.beginPath(); g.moveTo(x0, y0);
+    let x = x0, y = y0, a = dir;
+    const seg = 4 + (Math.random() * 4 | 0);
+    for (let i = 0; i < seg; i++) {
+      a += (Math.random() - 0.5) * 0.8;
+      x += Math.cos(a) * (len / seg);
+      y += Math.sin(a) * (len / seg);
+      g.lineTo(x, y);
+    }
+    g.stroke();
+    if (depth > 0 && Math.random() < 0.55) crack(x, y, a + (Math.random() - 0.5) * 1.5, len * 0.5, w * 0.6, depth - 1);
+  };
+  crack(cx - 21, cy + 66, Math.PI * 0.97, 42, 1.5, 1);
+  crack(cx + 20, cy + 68, Math.PI * 0.03, 40, 1.5, 1);
+  crack(cx - 50, EY + 6, Math.PI * 1.05, 28, 1.1, 1);
+  crack(cx + 50, EY + 3, Math.PI * -0.05, 27, 1.1, 1);
+  crack(cx - 9, cy - 64, Math.PI * 1.46, 32, 1.0, 1);
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * 6.283, r = 26 + Math.random() * 58;
+    crack(cx + Math.cos(a) * r * 0.78, cy + Math.sin(a) * r, Math.random() * 6.283, 6 + Math.random() * 12, 0.5, 0);
+  }
+
+  grain(g, S, H, 13);
+
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   cache.set(key, t);

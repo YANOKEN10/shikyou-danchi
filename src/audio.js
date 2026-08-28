@@ -194,7 +194,10 @@ export class Sound {
   // その分を戻さないと、足音や扉の音だけが極端に小さくなってしまう。
   _makeup(type, freq, q) {
     const nyq = (this.ctx ? this.ctx.sampleRate : 48000) / 2;
-    const bw = type === "bandpass" ? freq / Math.max(0.3, q) : freq;
+    let bw;
+    if (type === "bandpass") bw = freq / Math.max(0.3, q);
+    else if (type === "highpass") bw = nyq - freq;   // 上が全部通るので、ほとんど減らない
+    else bw = freq;                                   // lowpass など
     return Math.min(22, Math.max(1, Math.sqrt(nyq / Math.max(20, bw))));
   }
 
@@ -321,18 +324,24 @@ export class Sound {
     }
   }
 
+  // 何かを手に取る。音程は上げない（上げると「取った！」の効果音になってしまう）
   pickup() {
-    this.tone({ type: "sine", f0: 520, f1: 780, vol: 0.14, dur: 0.18, wet: 0.5 });
-    this.burst({ freq: 3000, q: 1, vol: 0.06, dur: 0.05 });
+    this.burst({ freq: 1500, q: 1.8, vol: 0.15, dur: 0.055, wet: 0.4, rate: 0.9 });
+    this.tone({ type: "triangle", f0: 120, f1: 82, vol: 0.08, dur: 0.17, wet: 0.6 });
+    setTimeout(() => this.burst({ freq: 430, q: 1.2, vol: 0.19, dur: 0.10, wet: 0.7 }), 45);
+    setTimeout(() => this.burst({ freq: 3400, q: 0.7, vol: 0.055, dur: 0.05, wet: 0.3 }), 95);
   }
 
   click() {
-    this.burst({ freq: 3200, q: 6, vol: 0.85, dur: 0.03, wet: 0.15 });
-    this.burst({ freq: 900, q: 4, vol: 0.5, dur: 0.045, wet: 0.15 });
-    this.tone({ type: "square", f0: 240, f1: 120, vol: 0.05, dur: 0.035, wet: 0.1 });
+    this.burst({ freq: 2700, q: 7, vol: 0.80, dur: 0.018, wet: 0.12 });
+    setTimeout(() => this.burst({ freq: 720, q: 5, vol: 0.45, dur: 0.032, wet: 0.14 }), 18);
   }
 
-  ui() { this.tone({ type: "sine", f0: 700, vol: 0.06, dur: 0.06, wet: 0.2 }); }
+  // 画面の操作音。乾いた小さな打音だけ（音程を持たせない）
+  ui() {
+    this.burst({ freq: 1100, q: 3.5, vol: 0.10, dur: 0.022, wet: 0.12 });
+    this.burst({ freq: 300, q: 2.2, vol: 0.07, dur: 0.03, wet: 0.12 });
+  }
 
   // 遠くの物音
   thud(far) {
@@ -358,7 +367,7 @@ export class Sound {
     this.burst({ freq: 420, q: 3.2, vol: 0.34, dur: 0.05, wet: 0.7 });
     setTimeout(() => {
       this.burst({ freq: 1500, q: 6, vol: 0.30, dur: 0.04, wet: 0.7 });
-      this.tone({ type: "square", f0: 150, f1: 70, vol: 0.09, dur: 0.07, wet: 0.5 });
+      this.tone({ type: "triangle", f0: 128, f1: 58, vol: 0.11, dur: 0.09, wet: 0.6 });
     }, 55);
   }
 
@@ -394,14 +403,15 @@ export class Sound {
   }
 
   // 鏡が、澄んだ音で鳴る
+  // 鏡が鳴る。わずかにずれた音を重ねて、耳ざわりな「うなり」を作る
   mirrorRing() {
-    [1, 1.51, 2.03].forEach((k, i) => {
+    [[213, 0.085], [219.7, 0.075], [436, 0.032]].forEach(([f, v], i) => {
       this.tone({
-        type: "sine", f0: 1180 * k, f1: 1180 * k * 0.985,
-        vol: 0.06 / (i + 1), dur: 2.2 + i * 0.5, atk: 0.02, wet: 1.4,
+        type: "sine", f0: f, f1: f * 0.968,
+        vol: v, dur: 3.2 + i * 0.7, atk: 0.35, wet: 1.6,
       });
     });
-    this.burst({ freq: 5200, q: 2, vol: 0.05, dur: 0.12, wet: 1.0 });
+    this.burst({ freq: 2500, q: 7, vol: 0.05, dur: 0.6, atk: 0.25, wet: 1.4 });
   }
 
   // 押し入れ・引き出し
@@ -427,9 +437,10 @@ export class Sound {
 
   // 水が一滴
   drip() {
-    const f = rnd(700, 1300);
-    this.tone({ type: "sine", f0: f, f1: f * 0.45, vol: 0.22, dur: 0.13, atk: 0.002, wet: 1.5 });
-    this.burst({ freq: f * 2.2, q: 3, vol: 0.10, dur: 0.03, wet: 1.2 });
+    const f = rnd(330, 520);
+    this.burst({ freq: f, q: 9, vol: 0.22, dur: 0.055, atk: 0.001, wet: 1.7 });
+    this.tone({ type: "sine", f0: f * 1.5, f1: f * 0.42, vol: 0.09, dur: 0.06, atk: 0.001, wet: 1.5 });
+    setTimeout(() => this.burst({ freq: f * 0.6, q: 5, vol: 0.08, dur: 0.13, wet: 1.9 }), 32);
   }
 
   // 外廊下を抜ける風
@@ -455,9 +466,10 @@ export class Sound {
 
   // 蛍光灯が切れる
   tubePop() {
-    this.burst({ freq: 2600, q: 1.2, vol: 0.40, dur: 0.03, wet: 0.9 });
-    this.tone({ type: "square", f0: 1400, f1: 220, vol: 0.10, dur: 0.06, wet: 0.6 });
-    setTimeout(() => this.burst({ freq: 6000, q: 0.8, vol: 0.09, dur: 0.05, wet: 0.5 }), 30);
+    this.burst({ type: "highpass", freq: 1900, vol: 0.30, dur: 0.012, atk: 0.001, wet: 0.9 });
+    this.burst({ freq: 620, q: 1.4, vol: 0.26, dur: 0.05, wet: 1.1 });
+    this.tone({ type: "sawtooth", f0: 92, f1: 38, vol: 0.06, dur: 0.10, wet: 0.6 });
+    setTimeout(() => this.burst({ freq: 2200, q: 0.8, vol: 0.07, dur: 0.20, wet: 0.7, rate: 0.6 }), 28);
   }
 
   // ブラウン管の鳴き（部屋にいるあいだ）
