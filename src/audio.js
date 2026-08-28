@@ -70,9 +70,13 @@ export class Sound {
 
       const a = document.createElement("audio");
       a.setAttribute("playsinline", "");
+      a.setAttribute("aria-hidden", "true");
       a.loop = true;
       a.volume = 0.0001;
+      a.style.cssText = "position:fixed;width:0;height:0;opacity:0;pointer-events:none";
       a.src = "data:audio/wav;base64," + btoa(bin);
+      // 画面には出ないが、DOM に置いておく（iOS はそのほうが確実）
+      document.body.appendChild(a);
       const p = a.play();
       if (p && p.catch) p.catch(() => { /* 流せなくても、ふつうは鳴ります */ });
       this._silent = a;
@@ -380,7 +384,7 @@ export class Sound {
     const g = ctx.createGain();
     const dur = rnd(0.25, 0.5);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.22, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.40, t + 0.05);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
 
     osc.connect(f); f.connect(g);
