@@ -140,6 +140,40 @@
   #stamFill { background: rgba(210,220,230,.55); }
   #hud .lbl { font-size: 10px; letter-spacing: .18em; color: rgba(255,255,255,.42); }
 
+  /* 鬼ごっこの残り時間など */
+  #versus {
+    position: fixed; left: 50%; top: 12px; transform: translateX(-50%);
+    z-index: 8; pointer-events: none; opacity: 0; transition: opacity .3s ease;
+    font-family: var(--mincho); font-size: clamp(14px, 2.4vw, 19px); letter-spacing: .1em;
+    color: #e6e0cf; background: rgba(6,7,10,.62); padding: 6px 16px; border-radius: 3px;
+    border: 1px solid rgba(220,214,200,.22); white-space: nowrap;
+  }
+  #versus.show { opacity: 1; }
+  #versus.oni { color: #e8b0a0; border-color: rgba(190,90,70,.4); }
+
+  /* ロビー */
+  #lobby .panel { max-width: 460px; }
+  .code {
+    font-family: var(--mincho); font-size: clamp(34px, 10vw, 54px); letter-spacing: .32em;
+    text-align: center; color: var(--accent); margin: 10px 0 4px; text-indent: .32em;
+  }
+  .who { display: flex; flex-direction: column; gap: 5px; margin: 14px 0; }
+  .whorow {
+    display: flex; align-items: center; gap: 9px; font-size: 13.5px;
+    background: #12151a; border: 1px solid var(--line); border-radius: 3px; padding: 9px 12px;
+  }
+  .whorow .dot { width: 8px; height: 8px; border-radius: 50%; background: #4a4a4a; flex: none; }
+  .whorow.ok .dot { background: #8fbf7a; }
+  .whorow .tagm { margin-left: auto; font-size: 11px; color: var(--dim); }
+  label.pick { display: block; font-size: 12px; color: var(--dim); margin: 14px 0 5px; }
+  .floors { display: flex; gap: 5px; }
+  .floors .f {
+    flex: 1; text-align: center; padding: 10px 0; font-size: 13px; cursor: pointer;
+    background: #0a0c10; border: 1px solid var(--line); color: var(--dim); border-radius: 3px;
+  }
+  .floors .f.on { background: #1d1a14; border-color: var(--accent); color: var(--accent); }
+  #codeIn { text-align: center; letter-spacing: .3em; text-transform: uppercase; font-size: 24px; }
+
   #whoami {
     position: fixed; top: 10px; right: 12px; z-index: 7;
     font-size: 11px; color: rgba(220,214,200,.5);
@@ -323,6 +357,7 @@
 <div id="flash"></div>
 
 <div id="floorTag"></div>
+<div id="versus"></div>
 <div id="prompt"></div>
 <div id="sub"></div>
 <div id="whoami"></div>
@@ -391,6 +426,45 @@
   </div>
 </div>
 
+<!-- 鬼ごっこのロビー -->
+<div class="sheet" id="lobby">
+  <div class="panel">
+    <h2>鬼ごっこ</h2>
+    <p class="dim" id="lobbyLead">
+      2〜4人。ひとりが「それ」になり、残りは鍵を三本あつめて階段室から逃げます。
+    </p>
+
+    <div id="lobbyMake">
+      <label class="pick">どの階で遊ぶか</label>
+      <div class="floors" id="floorPick">
+        <div class="f on" data-f="1">一階</div>
+        <div class="f" data-f="2">二階</div>
+        <div class="f" data-f="3">三階</div>
+        <div class="f" data-f="4">四階</div>
+        <div class="f" data-f="5">五階</div>
+      </div>
+      <button class="big" id="mkRoom">部屋をつくる</button>
+      <label class="pick">友達の合言葉を入れる</label>
+      <input id="codeIn" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="＿＿＿＿">
+      <button class="ghost" id="joinRoom">その部屋に入る</button>
+    </div>
+
+    <div id="lobbyWait" style="display:none">
+      <p class="dim">この合言葉を、友達に伝えてください。</p>
+      <div class="code" id="lobbyCode"></div>
+      <p class="dim" id="lobbyFloor"></p>
+      <div class="who" id="lobbyWho"></div>
+      <button class="big" id="startGame">はじめる</button>
+      <p class="hint" id="lobbyHint">友達がつながると、ここに名前が出ます。</p>
+      <p class="hint">部屋を作った人が審判をします。その人の画面を裏にすると、みんなの進行が止まります。</p>
+    </div>
+
+    <div class="msg" id="lobbyMsg"></div>
+    <hr>
+    <button class="ghost" id="lobbyClose">やめる</button>
+  </div>
+</div>
+
 <!-- ログイン -->
 <div class="sheet show" id="gate">
   <div class="panel">
@@ -440,6 +514,7 @@
 
       <button class="big" id="go" type="submit">ログイン</button>
       <button class="ghost" id="skip" type="button">ログインしないで遊ぶ</button>
+      <button class="ghost" id="toVersus" type="button">友達と遊ぶ（鬼ごっこ）</button>
       <div class="msg" id="msg"></div>
     </form>
 

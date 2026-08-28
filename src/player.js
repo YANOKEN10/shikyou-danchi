@@ -47,6 +47,8 @@ export class Player {
     this.wantBook = false;
     this.wantPause = false;
 
+    this.speedMul = 1;      // 鬼は少し速い
+    this.noTire = false;    // 鬼は疲れない
     this.sensPC = 0.0022;
     this.sensTouch = 0.0042;
     this.invertY = false;
@@ -272,7 +274,10 @@ export class Player {
     this.running = wantRun && !wantCrouch && mag > 0.2 && this.stamina > 0.02 && !this.tired;
 
     // 体力
-    if (this.running) {
+    if (this.noTire) {
+      this.stamina = 1;
+      this.tired = false;
+    } else if (this.running) {
       this.stamina = Math.max(0, this.stamina - dt * 0.28);
       if (this.stamina <= 0) this.tired = true;
     } else {
@@ -280,7 +285,7 @@ export class Player {
       if (this.tired && this.stamina > 0.35) this.tired = false;
     }
 
-    const speed = this.crouch ? 1.25 : this.running ? 4.5 : 2.45;
+    const speed = (this.crouch ? 1.25 : this.running ? 4.5 : 2.45) * this.speedMul;
 
     // 進む向きは、見ている向き
     // カメラの向き（-sin, -cos）にそろえる。ここがずれると、見ている方向と進む方向が食い違う

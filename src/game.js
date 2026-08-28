@@ -412,6 +412,17 @@ export class Game {
       }
     });
 
+    // 鬼ごっこ中は、物語のしかけを止めて対戦の進行だけを回す
+    if (this.versus && this.versus.on) {
+      this.versus.update(dt);
+      this._interact();
+      this.ui.setBattery(p.battery, p.hasLight);
+      this.ui.setStamina(p.stamina);
+      this.ui.tickSub(dt);
+      if (p.wantPause) { p.wantPause = false; this.doPause(); }
+      return;
+    }
+
     // 追跡者
     let out = { tension: 0, veryNear: 0, caught: false, spotted: false };
     if (this.stalkers.active) out = this.stalkers.update(dt, p, f.col, this.snd);
@@ -981,6 +992,31 @@ export class Game {
     });
   }
 
+  /* ---------------- 鬼ごっこ ---------------- */
+
+  async startVersus(versus, floorNo, oniSlot, keys) {
+    this.versus = versus;
+    this.snd.unlock();
+    this.snd.ambienceOn();
+    this.ui.closeAll();
+    await this.ui.fade(1, 0.4);
+    await versus.start(floorNo, oniSlot, keys);
+    await this.ui.fade(0, 1.0);
+    this.running = true;
+    this.paused = false;
+    this.player.frozen = false;
+    this.clock.getDelta();
+    this._loop();
+  }
+
+  endVersus() {
+    if (!this.versus) return;
+    this.versus.stop();
+    this.versus = null;
+    this.ui.setVersus("");
+    this.player.frozen = false;
+  }
+
   /* ---------------- 帳面・ポーズ ---------------- */
 
   _openBook() {
@@ -1021,6 +1057,14 @@ export class Game {
       };
 
       mk("つづける", "big", () => this.resume());
+
+      // 鬼ごっこ中は、記録も物語も関係ない
+      if (this.versus && this.versus.on) {
+        mk("鬼ごっこをやめる", "danger", () => { if (this.onQuitVersus) this.onQuitVersus(); });
+        mk("音のたしかめ", "ghost", () => this._soundPanel());
+        return;
+      }
+
       mk("いま記録する", "ghost", async (b) => {
         b.disabled = true; b.textContent = "記録しています…";
         await this.save();
@@ -1028,6 +1072,7 @@ export class Game {
       });
       mk("持ち物とメモ", "ghost", () => { this.ui.closePause(); this._openBook(); });
       mk("音のたしかめ", "ghost", () => this._soundPanel());
+      mk("友達と遊ぶ（鬼ごっこ）", "ghost", () => { this.ui.closePause(); if (this.onWantVersus) this.onWantVersus(); });
 
       // 音・操作
       const opt = document.createElement("div");

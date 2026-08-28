@@ -1141,6 +1141,52 @@ export function buildEntity() {
   return g;
 }
 
+/* ---------- 友達（住人）の姿 ---------- */
+//  暗い廊下でも、味方だと分かるように名札と懐中電灯の光を持たせます。
+
+export function buildSurvivor(name) {
+  const g = new THREE.Group();
+  const coat = new THREE.MeshLambertMaterial({ color: 0x3d4654 });
+  const skin = new THREE.MeshLambertMaterial({ color: 0x6d6259 });
+
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.20, 0.62, 4, 10), coat);
+  body.position.y = 1.02;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.125, 12, 10), skin);
+  head.position.y = 1.55;
+  g.add(head);
+  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.42, 3, 8), coat);
+  legs.position.y = 0.36;
+  g.add(legs);
+
+  // 名札。いつもこちらを向く
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: TX.nameTag(name), transparent: true, depthTest: false, depthWrite: false,
+  }));
+  tag.scale.set(1.1, 0.28, 1);
+  tag.position.y = 1.92;
+  g.add(tag);
+
+  // その人の懐中電灯（遠くからでも位置が分かる）
+  const torch = new THREE.PointLight(0xffe6bb, 3.0, 6.0, 1.7);
+  torch.position.set(0, 1.4, 0.25);
+  g.add(torch);
+
+  g.userData = {
+    body, head, legs, tag, torch,
+    setHeld(held, out) {
+      const s = held ? 0.55 : 1;
+      body.scale.y = s; legs.scale.y = s;
+      head.position.y = held ? 1.05 : 1.55;
+      tag.position.y = held ? 1.35 : 1.92;
+      coat.color.setHex(held ? 0x5a3f42 : 0x3d4654);
+      torch.intensity = out ? 0 : held ? 0.6 : 3.0;
+      g.visible = !out;
+    },
+  };
+  return g;
+}
+
 export function animateEntity(ent, dt, moving) {
   const u = ent.userData;
   u.phase += dt * (moving ? 2.6 : 0.8);

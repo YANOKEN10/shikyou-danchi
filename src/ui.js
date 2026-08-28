@@ -18,7 +18,7 @@ export class UI {
       book: $("book"), bookBody: $("bookBody"), bookClose: $("bookClose"),
       pause: $("pause"), pauseBody: $("pauseBody"),
       ending: $("ending"), endingBody: $("endingBody"),
-      toast: $("toast"), fade: $("fade"), floorTag: $("floorTag"),
+      toast: $("toast"), fade: $("fade"), floorTag: $("floorTag"), versus: $("versus"),
       grain: $("grain"),
     };
     this.subQueue = [];
@@ -87,6 +87,15 @@ export class UI {
   setStamina(v) {
     this.el.stam.style.width = Math.max(0, Math.min(1, v)) * 100 + "%";
     this.el.stam.parentElement.style.opacity = v > 0.98 ? 0 : 1;
+  }
+
+  // 鬼ごっこの表示（残り時間・鍵・人数）
+  setVersus(text, isOni) {
+    const el = this.el.versus;
+    if (!el) return;
+    el.textContent = text || "";
+    el.classList.toggle("show", Boolean(text));
+    el.classList.toggle("oni", Boolean(isOni));
   }
 
   setTension(v) {

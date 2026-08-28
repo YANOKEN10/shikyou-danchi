@@ -507,6 +507,25 @@ export function hair() {
   return t;
 }
 
+// 名札（頭の上に浮かぶ）
+export function nameTag(name) {
+  const key = "tag:" + name;
+  if (cache.has(key)) return cache.get(key);
+  const c = cv(256, 64);
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, 256, 64);
+  g.font = "bold 30px 'Noto Sans JP', 'Hiragino Sans', sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.lineWidth = 6; g.strokeStyle = "rgba(4,5,8,0.9)";
+  g.strokeText(name, 128, 34);
+  g.fillStyle = "#e6e0cf";
+  g.fillText(name, 128, 34);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t);
+  return t;
+}
+
 // 「それ」の衣。縦の襞と、黴のような染み
 export function shroud() {
   return tex("shroud", 256, 512, (g, w, h) => {

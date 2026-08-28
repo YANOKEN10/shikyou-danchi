@@ -7,6 +7,8 @@
 import { Sound } from "./audio.js";
 import { Cloud } from "./cloud.js";
 import { Game } from "./game.js";
+import { Net } from "./net.js";
+import { Versus } from "./versus.js";
 import { TITLE, SUB, FLOORS, MEMO_ORDER } from "./story.js";
 
 const $ = (id) => document.getElementById(id);
@@ -96,6 +98,8 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
+$("toVersus").onclick = () => openLobby();
+
 $("skip").onclick = () => {
   snd.unlock(); snd.ui();
   cloud.mode = "guest";
@@ -184,6 +188,8 @@ function ensureGame() {
   game.onFinish = () => {
     location.reload();
   };
+  game.onWantVersus = openLobby;
+  game.onQuitVersus = quitVersus;
   bindTouch(game);
   // 手元で動かしているときだけ、確認用に取り出せるようにしておく
   if (location.hostname === "localhost" || location.hostname === "127.0.0.1") window.__g = game;
@@ -234,6 +240,150 @@ function updateWho() {
   w.textContent = cloud.signedIn ? "☁ " + cloud.display : "📱 この端末だけ";
   w.title = cloud.signedIn ? "ログイン中" : "ログインしていません";
 }
+
+/* ---------------- 鬼ごっこ ---------------- */
+
+const net = new Net();
+let versus = null;
+let lobbyFloor = 1;
+
+function lobbyMsg(text, kind) {
+  const m = $("lobbyMsg");
+  m.textContent = text || "";
+  m.className = "msg" + (kind ? " " + kind : "");
+}
+
+function myName() {
+  return (cloud.signedIn && cloud.display) || cloud.lastName || "プレイヤー";
+}
+
+function drawRoster() {
+  const box = $("lobbyWho");
+  box.innerHTML = "";
+  net.roster().forEach((r) => {
+    const d = document.createElement("div");
+    d.className = "whorow" + (r.ok ? " ok" : "");
+    const dot = document.createElement("i");
+    dot.className = "dot";
+    const nm = document.createElement("span");
+    nm.textContent = r.name;
+    const tag = document.createElement("span");
+    tag.className = "tagm";
+    tag.textContent = r.slot === "host" ? "部屋の主" : (r.ok ? "つながった" : "つないでいます…");
+    d.appendChild(dot); d.appendChild(nm); d.appendChild(tag);
+    box.appendChild(d);
+  });
+  const n = net.roster().length;
+  $("startGame").disabled = !(net.role === "host" && n >= 2 && net.openCount() >= n - 1);
+  $("startGame").textContent = net.role === "host"
+    ? (n < 2 ? "友達を待っています…" : "はじめる（" + n + "人）")
+    : "部屋の主が始めるのを待っています…";
+  if (net.role !== "host") $("startGame").disabled = true;
+}
+
+function openLobby() {
+  snd.unlock(); snd.ui();
+  $("lobby").classList.add("show");
+  $("lobbyMake").style.display = "";
+  $("lobbyWait").style.display = "none";
+  lobbyMsg("");
+  if (game) game.paused = true;
+}
+
+function closeLobby() {
+  $("lobby").classList.remove("show");
+}
+
+document.querySelectorAll("#floorPick .f").forEach((el) => {
+  el.onclick = () => {
+    document.querySelectorAll("#floorPick .f").forEach((x) => x.classList.remove("on"));
+    el.classList.add("on");
+    lobbyFloor = Number(el.dataset.f) || 1;
+    snd.ui();
+  };
+});
+
+$("mkRoom").onclick = async () => {
+  lobbyMsg("部屋をつくっています…");
+  const r = await net.host(myName(), lobbyFloor);
+  if (!r.ok) { lobbyMsg(r.why, "err"); return; }
+  net.onMembers = drawRoster;
+  net.onDrop = drawRoster;
+  net.onReady = drawRoster;
+  net.onMessage = lobbyMessage;
+  $("lobbyMake").style.display = "none";
+  $("lobbyWait").style.display = "";
+  $("lobbyCode").textContent = r.code;
+  $("lobbyFloor").textContent = (FLOORS[lobbyFloor - 1] || {}).title + "で遊びます";
+  lobbyMsg("");
+  drawRoster();
+};
+
+$("joinRoom").onclick = async () => {
+  const code = ($("codeIn").value || "").trim().toUpperCase();
+  if (code.length !== 4) { lobbyMsg("合言葉は4文字です。", "err"); return; }
+  lobbyMsg("その部屋を探しています…");
+  const r = await net.join(code, myName());
+  if (!r.ok) { lobbyMsg(r.why, "err"); return; }
+  net.onMembers = drawRoster;
+  net.onDrop = drawRoster;
+  net.onReady = drawRoster;
+  net.onMessage = lobbyMessage;
+  lobbyFloor = r.floor || 1;
+  $("lobbyMake").style.display = "none";
+  $("lobbyWait").style.display = "";
+  $("lobbyCode").textContent = code;
+  $("lobbyFloor").textContent = (FLOORS[lobbyFloor - 1] || {}).title + "で遊びます";
+  $("lobbyHint").textContent = "つながりました。部屋の主が始めるのを待ちましょう。";
+  lobbyMsg("");
+  drawRoster();
+};
+
+$("startGame").onclick = async () => {
+  if (net.role !== "host") return;
+  snd.ui();
+  const slots = net.roster().map((r) => r.slot);
+  const oni = slots[Math.floor(Math.random() * slots.length)];
+  await net.begin();
+  const g = ensureGame();
+  versus = new Versus(g, net);
+  versus.onAgain = () => location.reload();
+  const keys = null;   // ホストが決めて、下で配ります
+  // 先に鍵を決めるため、いったん組み立ててから配る
+  g.onQuitVersus = quitVersus;
+  closeLobby();
+  await g.startVersus(versus, lobbyFloor, oni, keys);
+  net.broadcast({ t: "go", oni: oni, floor: lobbyFloor, keys: versus.keys.map((k) => ({ x: k.x, z: k.z })) });
+};
+
+function lobbyMessage(from, o) {
+  if (!o || o.t !== "go") return;
+  const g = ensureGame();
+  versus = new Versus(g, net);
+  versus.onAgain = () => location.reload();
+  g.onQuitVersus = quitVersus;
+  closeLobby();
+  g.startVersus(versus, o.floor || 1, o.oni, o.keys);
+}
+
+async function quitVersus() {
+  const g = ensureGame();
+  g.endVersus();
+  versus = null;
+  await net.leave();
+  location.reload();
+}
+
+$("lobbyClose").onclick = async () => {
+  snd.ui();
+  await net.leave();
+  closeLobby();
+  if (game && game.running) game.resume();
+};
+
+$("codeIn").addEventListener("input", () => {
+  $("codeIn").value = $("codeIn").value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, "").slice(0, 4);
+});
 
 /* ---------------- 起動 ---------------- */
 
