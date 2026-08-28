@@ -1177,7 +1177,7 @@ export function buildEntity() {
 
   // 顔。暗くても、うっすら見えるように光らせておく
   const faceMat = new THREE.MeshBasicMaterial({
-    map: TX.face(), transparent: true, opacity: 0.88, depthWrite: false,
+    map: TX.face(), transparent: true, opacity: 0.95, depthWrite: false,
   });
   const face = new THREE.Mesh(new THREE.PlaneGeometry(0.235, 0.29), faceMat);
   face.position.set(0, -0.022, 0.152);
@@ -1187,12 +1187,12 @@ export function buildEntity() {
   const hairMat = new THREE.MeshLambertMaterial({
     map: TX.hair(), color: 0x32323b, transparent: true, side: THREE.FrontSide, depthWrite: false,
   });
-  const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.139, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.88), hairMat);
-  hairTop.scale.set(1.03, 1.22, 1.03);
+  const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.134, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.92), hairMat);
+  hairTop.scale.set(1.02, 1.20, 1.02);
   headPivot.add(hairTop);
 
-  const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.148, 0.23, 0.72, 18, 1, true), hairMat);
-  veil.position.y = -0.44;
+  const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.142, 0.20, 0.80, 18, 1, true), hairMat);
+  veil.position.y = -0.50;
   headPivot.add(veil);
 
   // 前髪。顔をほとんど覆う
@@ -1200,8 +1200,8 @@ export function buildEntity() {
   const bangMat = new THREE.MeshLambertMaterial({
     map: TX.hairFront(), color: 0x4a4a55, transparent: true, side: THREE.FrontSide, depthWrite: false,
   });
-  const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.295, 0.37), bangMat);
-  bang.position.set(0, -0.085, 0.168);
+  const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.92), bangMat);
+  bang.position.set(0, -0.275, 0.152);
   headPivot.add(bang);
 
   // この一体だけ、別の層で照らす（懐中電灯で白飛びさせないため）

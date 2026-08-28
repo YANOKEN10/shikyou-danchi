@@ -555,58 +555,100 @@ export function shroud() {
   }, 1, 1);
 }
 
-// 顔の前に垂れる髪。房だけ。板の四角が出ないよう、ふちは消す
+// 髪。まんなかで分けて、両側へ長く落とす。
+//  1) 頭をおおう塊を描き
+//  2) まんなか（顔）を抜き
+//  3) その外側から、長い房を垂らす
+// という順で作るので、板の四角い縁が出ません。
 export function hairFront() {
   const key = "hairFront";
   if (cache.has(key)) return cache.get(key);
-  const W = 256, H = 320;
+  const W = 256, H = 512;
   const c = cv(W, H);
   const g = c.getContext("2d");
   g.clearRect(0, 0, W, H);
 
-  // 房を、長さも太さもばらばらに垂らす
-  for (let i = 0; i < 46; i++) {
-    const x = Math.random() * W;
-    const len = 70 + Math.random() * 250;
-    const w = 3 + Math.random() * 11;
-    const lean = (Math.random() - 0.5) * 26;
-    const v = 30 + Math.random() * 22;
-    const grd = g.createLinearGradient(0, 0, 0, len);
-    grd.addColorStop(0, "rgba(" + v + "," + v + "," + (v + 6) + ",1)");
-    grd.addColorStop(0.7, "rgba(" + (v - 10) + "," + (v - 10) + "," + (v - 4) + ",0.9)");
-    grd.addColorStop(1, "rgba(10,10,14,0)");
+  const CX = W / 2;
+  const HY = 104, HRX = 104, HRY = 116;   // 頭のだいたいの位置と大きさ
+
+  /* 1) 頭をおおう髪の塊 */
+  const mass = g.createRadialGradient(CX, HY - 20, 10, CX, HY + 10, HRY);
+  mass.addColorStop(0, "rgba(48,48,55,1)");
+  mass.addColorStop(0.7, "rgba(34,34,40,1)");
+  mass.addColorStop(1, "rgba(22,22,27,1)");
+  g.fillStyle = mass;
+  g.beginPath(); g.ellipse(CX, HY, HRX, HRY, 0, 0, 7); g.fill();
+
+  /* 2) 顔を抜く。分け目の切れ込みも入れる */
+  g.globalCompositeOperation = "destination-out";
+  g.beginPath(); g.ellipse(CX, HY + 30, 68, 100, 0, 0, 7); g.fill();
+  g.beginPath();
+  g.moveTo(CX - 11, -10); g.lineTo(CX + 11, -10);
+  g.quadraticCurveTo(CX + 5, 40, CX + 3, 74);
+  g.lineTo(CX - 3, 74);
+  g.quadraticCurveTo(CX - 5, 40, CX - 11, -10);
+  g.closePath(); g.fill();
+  g.globalCompositeOperation = "source-over";
+
+  /* 3) 横へ流れる長い房 */
+  const lock = (x0, y0, side, len, w, lean, v) => {
+    const grd = g.createLinearGradient(0, y0, 0, y0 + len);
+    grd.addColorStop(0, "rgba(" + v + "," + v + "," + (v + 7) + ",1)");
+    grd.addColorStop(0.6, "rgba(" + (v - 8) + "," + (v - 8) + "," + (v - 1) + ",0.95)");
+    grd.addColorStop(1, "rgba(8,8,12,0)");
     g.fillStyle = grd;
     g.beginPath();
-    g.moveTo(x - w / 2, 0);
-    g.lineTo(x + w / 2, 0);
-    g.lineTo(x + lean + w * 0.15, len);
-    g.lineTo(x + lean - w * 0.15, len);
-    g.closePath();
-    g.fill();
-  }
-  // 生え際は、でこぼこに詰める（まっすぐだと板の四角が出る）
-  g.fillStyle = "rgba(36,36,42,0.9)";
-  g.beginPath();
-  g.moveTo(0, 0); g.lineTo(W, 0);
-  for (let x = W; x >= 0; x -= 12) g.lineTo(x, 10 + Math.random() * 22);
-  g.closePath(); g.fill();
+    g.moveTo(x0 - w / 2, y0);
+    g.lineTo(x0 + w / 2, y0);
+    g.quadraticCurveTo(x0 + side * lean * 0.45, y0 + len * 0.55, x0 + side * lean + w * 0.1, y0 + len);
+    g.lineTo(x0 + side * lean - w * 0.1, y0 + len);
+    g.quadraticCurveTo(x0 + side * lean * 0.45 - w * 0.5, y0 + len * 0.55, x0 - w / 2, y0);
+    g.closePath(); g.fill();
+  };
 
-  // ふちを消して、板の四角が出ないようにする
+  for (let i = 0; i < 30; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    // 顔のわきから外へ。頭の輪郭より内側から生やす
+    const off = 52 + Math.random() * 48;
+    const x0 = CX + side * off;
+    const y0 = 20 + Math.random() * 90;
+    lock(x0, y0, side, 230 + Math.random() * 220, 6 + Math.random() * 15,
+      6 + Math.random() * 26, 30 + Math.random() * 20);
+  }
+  // いちばん外は、胸のあたりまで
+  for (let i = 0; i < 10; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    lock(CX + side * (72 + Math.random() * 34), 50 + Math.random() * 60, side,
+      330 + Math.random() * 130, 7 + Math.random() * 13,
+      3 + Math.random() * 14, 26 + Math.random() * 16);
+  }
+  // 分け目のきわに、細い後れ毛
+  for (let i = 0; i < 8; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    lock(CX + side * (10 + Math.random() * 26), 10 + Math.random() * 30, side,
+      90 + Math.random() * 130, 2 + Math.random() * 3.5,
+      12 + Math.random() * 24, 36 + Math.random() * 16);
+  }
+  // 塊の上にも、房の筋を重ねて質感を出す（頭からはみ出して角にならない位置から）
+  for (let i = 0; i < 22; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    lock(CX + side * (14 + Math.random() * 70), 26 + Math.random() * 34, side,
+      60 + Math.random() * 110, 3 + Math.random() * 7,
+      5 + Math.random() * 13, 44 + Math.random() * 18);
+  }
+
+  /* ふちを消して、板の四角が出ないようにする */
   g.globalCompositeOperation = "destination-out";
-  const side = g.createLinearGradient(0, 0, W, 0);
-  side.addColorStop(0, "rgba(0,0,0,1)");
-  side.addColorStop(0.16, "rgba(0,0,0,0)");
-  side.addColorStop(0.84, "rgba(0,0,0,0)");
-  side.addColorStop(1, "rgba(0,0,0,1)");
-  g.fillStyle = side; g.fillRect(0, 0, W, H);
-  const bot = g.createLinearGradient(0, H * 0.58, 0, H);
+  const sideFade = g.createLinearGradient(0, 0, W, 0);
+  sideFade.addColorStop(0, "rgba(0,0,0,1)");
+  sideFade.addColorStop(0.055, "rgba(0,0,0,0)");
+  sideFade.addColorStop(0.945, "rgba(0,0,0,0)");
+  sideFade.addColorStop(1, "rgba(0,0,0,1)");
+  g.fillStyle = sideFade; g.fillRect(0, 0, W, H);
+  const bot = g.createLinearGradient(0, H * 0.74, 0, H);
   bot.addColorStop(0, "rgba(0,0,0,0)");
   bot.addColorStop(1, "rgba(0,0,0,1)");
   g.fillStyle = bot; g.fillRect(0, 0, W, H);
-  const top = g.createLinearGradient(0, 0, 0, 30);
-  top.addColorStop(0, "rgba(0,0,0,0.85)");
-  top.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = top; g.fillRect(0, 0, W, 30);
   g.globalCompositeOperation = "source-over";
 
   const t = new THREE.CanvasTexture(c);
@@ -615,7 +657,6 @@ export function hairFront() {
   return t;
 }
 
-// 顔。髪のすきまから、かろうじて見えるもの
 // 顔。参考写真の特徴（見開いた白目・皮膚のひび割れ・半開きの口）を
 // 描き起こしたもの。廊下の暗さの中では、顔は30〜80画素ほどにしかならない。
 // そこで読めるのは「蒼白い面」「二つの闇」「開いた口」の三つだけなので、
@@ -645,8 +686,8 @@ export function face() {
 
   /* --- 面。中央だけ明るく、ふちは闇へ落とす --- */
   const skin = g.createRadialGradient(cx, cy - 26, 8, cx, cy + 4, 118);
-  skin.addColorStop(0, "rgba(206,202,196,1)");
-  skin.addColorStop(0.38, "rgba(176,172,166,1)");
+  skin.addColorStop(0, "rgba(180,176,170,1)");
+  skin.addColorStop(0.38, "rgba(156,152,146,1)");
   skin.addColorStop(0.68, "rgba(104,101,98,0.94)");
   skin.addColorStop(0.87, "rgba(44,44,46,0.6)");
   skin.addColorStop(1, "rgba(16,16,18,0)");
