@@ -208,26 +208,32 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   };
 
   commonRoom(C);
+  commonWetArea(C);
   (FURNISH[room.kind] || FURNISH.kitchen)(C);
 
   /* --- 部屋の中のもの（拾う・読む） --- */
   if (unit.item) {
     const at = C.itemAt || [x0 + 1.0, z0 - 0.9];
+    const prop = buildItemProp(C, unit.item, at[0], at[1]);
     inter.push({
-      x: at[0], y: 0.95, z: at[1], r: 1.35,
-      kind: "item", id: unit.item, label: "手に取る", once: true, note: unit.note,
+      x: at[0], y: prop.userData.interactY || 0.8, z: at[1], r: 1.35,
+      kind: "item", id: unit.item, label: "手に取る", once: true, note: unit.note, prop,
     });
   }
   if (unit.memo && !unit.goal) {
+    const at = C.memoAt || [dx, zMid - 1.4];
+    const prop = buildMemoProp(C, unit.memo, at[0], at[1]);
     inter.push({
-      x: dx, y: 0.5, z: zMid - 1.4, r: 1.3,
-      kind: "memo", id: unit.memo, label: "読む", once: true,
+      x: at[0], y: prop.userData.interactY || 0.55, z: at[1], r: 1.3,
+      kind: "memo", id: unit.memo, label: "読む", once: true, prop,
     });
   }
   if (unit.goal) {
+    const at = C.goalAt || [x0 + 1.0, z1 + 1.15];
+    const prop = buildMemoProp(C, unit.memo || "m6", at[0], at[1]);
     inter.push({
-      x: x0 + 1.0, y: 0.8, z: z1 + 1.15, r: 1.2,
-      kind: "goal", id: unit.memo || "m6", label: "手に取る", once: true,
+      x: at[0], y: prop.userData.interactY || 0.76, z: at[1], r: 1.2,
+      kind: "goal", id: unit.memo || "m6", label: "手に取る", once: true, prop,
     });
   }
 
@@ -292,24 +298,177 @@ function commonRoom(C) {
   C.pb(0.09, 0.13, 0.015, mats.plate, x1 - 0.02, 0.32, z1 + 1.6, -Math.PI / 2);
 }
 
+/* ---------- どの部屋にもある水まわり ---------- */
+
+function hingedDoor(C, opt) {
+  const pivot = new THREE.Group();
+  pivot.position.set(opt.x, 0, opt.z);
+  pivot.rotation.y = opt.shut || 0;
+  const mesh = box(opt.w, opt.h, 0.055, opt.mat);
+  mesh.position.set(opt.w / 2, opt.h / 2, 0);
+  pivot.add(mesh);
+  C.g.add(pivot);
+  const rec = { pivot, open: false, opened: opt.opened, shut: opt.shut || 0, col: opt.collider, width: opt.w };
+  C.inter.push({ x: opt.ix, y: 1.0, z: opt.iz, r: 1.05, kind: "fixtureDoor", door: rec, label: opt.label });
+  return rec;
+}
+
+function commonWetArea(C) {
+  const { mats, x0, x1, z0, H } = C;
+  const front = z0 - 0.25, back = z0 - 2.85;
+  const left = x0 + 0.12, right = x0 + 1.62;
+  const doorW = 0.68;
+
+  // 水まわりを左へ寄せ、玄関から居室まで一直線に歩ける幅を中央に残す。
+  C.pb(right - left, 0.06, front - back, mats.tile, (left + right) / 2, 0.035, (front + back) / 2);
+  const split = z0 - 1.52;
+  C.pb(right - left, H, 0.08, mats.tile, (left + right) / 2, H / 2, split);
+  C.blk(left, split - 0.04, right, split + 0.04);
+
+  // 廊下側の壁は戸口だけ切り欠く。戸を開けたときだけ当たり判定も外す。
+  const makeFront = (za, zb, name) => {
+    const gap0 = za + 0.28, gap1 = gap0 + doorW;
+    C.pb(0.08, H, gap0 - za, mats.tile, right, H / 2, (za + gap0) / 2);
+    C.pb(0.08, H, zb - gap1, mats.tile, right, H / 2, (gap1 + zb) / 2);
+    C.blk(right - 0.04, za, right + 0.04, gap0);
+    C.blk(right - 0.04, gap1, right + 0.04, zb);
+    const dc = C.col.add(right - 0.05, gap0, right + 0.05, gap1, "fixtureDoor");
+    hingedDoor(C, { x: right, z: gap0, w: doorW, h: 1.92, mat: mats.frostglass, shut: Math.PI / 2, opened: 0,
+      collider: dc, ix: right + 0.38, iz: (gap0 + gap1) / 2, label: name + "を開ける" });
+  };
+  makeFront(split, front, "トイレ");
+  makeFront(back, split, "風呂");
+
+  // 便器は座面・ふた・タンクを分け、入口から用途が分かる形にする。
+  const toilet = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.29, 0.35, 16), mats.porcelain);
+  toilet.scale.z = 1.3; toilet.position.set(left + 0.48, 0.22, z0 - 0.78); C.g.add(toilet);
+  C.pb(0.5, 0.08, 0.58, mats.porcelain, left + 0.48, 0.43, z0 - 0.78);
+  C.pb(0.46, 0.65, 0.22, mats.porcelain, left + 0.48, 0.33, z0 - 0.39);
+  C.blk(left + 0.18, z0 - 1.12, left + 0.78, z0 - 0.3);
+
+  // 狭いトイレほど鏡の中の奥行きが不自然に見えるため、便器の横に縦長の鏡を置く。
+  addWetMirror(C, left + 0.035, 1.38, z0 - 0.82, Math.PI / 2, 0.42, 0.72, "トイレの鏡を覗く");
+  const toiletStain = plane(0.58, 0.72, mats.damp);
+  toiletStain.rotation.x = -Math.PI / 2;
+  toiletStain.position.set(left + 0.5, 0.068, z0 - 0.82);
+  C.g.add(toiletStain);
+
+  // 浴槽は縁と底を別にして、実際に中へ踏み込める洗い場を手前へ確保する。
+  const tubZ = z0 - 2.48;
+  C.pb(1.18, 0.5, 0.08, mats.porcelain, left + 0.69, 0.25, tubZ - 0.43);
+  C.pb(0.08, 0.5, 0.86, mats.porcelain, left + 0.14, 0.25, tubZ);
+  C.pb(0.08, 0.5, 0.86, mats.porcelain, right - 0.14, 0.25, tubZ);
+  C.pb(1.18, 0.12, 0.86, mats.porcelain, left + 0.69, 0.06, tubZ);
+  C.blk(left + 0.08, tubZ - 0.48, right - 0.08, tubZ + 0.48);
+
+  // 浴室の鏡は洗い場から正面に見える位置へ置き、見続けたときだけ人影を出す。
+  addWetMirror(C, left + 0.035, 1.35, z0 - 2.02, Math.PI / 2, 0.52, 0.68, "風呂の鏡を覗く");
+  const drain = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.012, 16), mats.drain);
+  drain.position.set(right - 0.28, 0.075, z0 - 1.87); C.g.add(drain);
+  // 排水口から伸びる髪は曲線にし、ただの黒い棒ではなく濡れて床へ貼り付いた形にする。
+  for (let i = 0; i < 11; i++) {
+    const a = (i / 11) * Math.PI * 1.8 - 0.7;
+    const len = 0.18 + Math.random() * 0.34;
+    const sx = right - 0.28, sz = z0 - 1.87;
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sx, 0.084, sz),
+      new THREE.Vector3(sx + Math.cos(a + 0.45) * len * 0.45, 0.086, sz + Math.sin(a + 0.45) * len * 0.45),
+      new THREE.Vector3(sx + Math.cos(a) * len, 0.085, sz + Math.sin(a) * len),
+    ]);
+    C.g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 0.006, 4, false), mats.wetHair));
+  }
+
+  // 右壁を共通の台所にし、部屋の種類にかかわらず流しと冷蔵庫を持たせる。
+  C.pb(1.45, 0.82, 0.48, mats.steel, x1 - 0.86, 0.41, z0 - 1.03);
+  C.blk(x1 - 1.62, z0 - 1.31, x1 - 0.1, z0 - 0.75);
+  const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.035, 16), mats.darksteel);
+  sink.scale.z = 1.35; sink.position.set(x1 - 0.88, 0.84, z0 - 1.03); C.g.add(sink);
+  buildFridge(C, x1 - 0.48, z0 - 2.25);
+}
+
+function addWetMirror(C, px, py, pz, ry, w, h, label) {
+  const frame = box(0.055, h + 0.1, w + 0.1, C.mats.rustedSteel);
+  frame.position.set(px, py, pz); C.g.add(frame);
+  const mirror = C.wall(w, h, C.mats.mirror, px + 0.035, py, pz, ry);
+  const smear = C.wall(w * 0.92, h * 0.92, C.mats.mirrorSmear, px + 0.044, py, pz, ry);
+  // 鏡像の人影を鏡面よりわずかに手前へ置き、ちらつき時のZファイティングを避ける。
+  addGhost(C, mirror, px + 0.052, py - 0.05, pz, ry, w * 0.68, h * 0.82);
+  C.inter.push({ x: px + 0.42, y: py, z: pz, r: 0.95, kind: "detail", label,
+    say: "曇った鏡に、自分ではない息の跡が増えている。", scare: "mirror", once: true });
+  return { mirror, smear };
+}
+
+function buildFridge(C, px, pz) {
+  const { mats } = C;
+  C.pb(0.66, 1.48, 0.62, mats.appliance, px, 0.74, pz);
+  C.blk(px - 0.36, pz - 0.34, px + 0.36, pz + 0.34);
+  const pivot = new THREE.Group();
+  pivot.position.set(px - 0.33, 0, pz + 0.325);
+  const door = box(0.66, 1.04, 0.055, mats.fridgeDoor);
+  door.position.set(0.33, 0.94, 0); pivot.add(door);
+  const handle = box(0.035, 0.55, 0.04, mats.darksteel);
+  handle.position.set(0.58, 0.94, 0.045); pivot.add(handle); C.g.add(pivot);
+  const inside = C.pb(0.54, 0.88, 0.03, mats.fridgeInside, px, 0.94, pz + 0.305);
+  inside.visible = false;
+  C.inter.push({ x: px, y: 1.0, z: pz + 0.7, r: 1.2, kind: "detail", label: "冷蔵庫を開ける",
+    say: "電気は止まっているのに、中が冷えている。", scare: "fridge", repeat: true,
+    fixture: { pivot, inside, open: false, opened: -Math.PI * 0.58 } });
+}
+
+function buildItemProp(C, id, px, pz) {
+  const g = new THREE.Group();
+  if (id === "light") {
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.24, 12), C.mats.darksteel);
+    body.rotation.x = Math.PI / 2; g.add(body);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.055, 0.07, 12), C.mats.steel);
+    lens.rotation.x = Math.PI / 2; lens.position.z = -0.15; g.add(lens);
+    const glass = new THREE.Mesh(new THREE.CircleGeometry(0.07, 12), C.mats.lens);
+    glass.position.z = -0.187; glass.rotation.y = Math.PI; g.add(glass);
+    const sw = box(0.04, 0.025, 0.06, C.mats.switchMat); sw.position.set(0, 0.065, -0.01); g.add(sw);
+    g.position.set(px, 0.82, pz); g.userData.interactY = 0.82;
+  } else if (id.indexOf("key") === 0) {
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.018, 6, 16), C.mats.key);
+    bow.rotation.x = Math.PI / 2; bow.position.x = -0.11; g.add(bow);
+    const shaft = box(0.22, 0.025, 0.045, C.mats.key); shaft.position.x = 0.035; g.add(shaft);
+    const tooth = box(0.055, 0.06, 0.045, C.mats.key); tooth.position.set(0.13, -0.025, 0); g.add(tooth);
+    const tag = box(0.13, 0.025, 0.09, C.mats.keyTag); tag.position.x = -0.22; g.add(tag);
+    g.position.set(px, 0.92, pz); g.rotation.z = -0.18; g.userData.interactY = 0.92;
+  } else {
+    const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.18, 10), C.mats.darksteel);
+    cell.rotation.z = Math.PI / 2; g.add(cell); g.position.set(px, 0.78, pz); g.userData.interactY = 0.78;
+  }
+  C.g.add(g);
+  return g;
+}
+
+function buildMemoProp(C, id, px, pz) {
+  const g = new THREE.Group();
+  const isLetter = id === "m5" || id === "m3draft";
+  if (isLetter) {
+    const env = box(0.3, 0.025, 0.2, C.mats.envelope); env.position.x = -0.12; env.rotation.y = -0.12; g.add(env);
+    const sheet = box(0.32, 0.012, 0.42, C.mats.letterPaper); sheet.position.set(0.13, 0.018, 0.08); sheet.rotation.y = 0.14; g.add(sheet);
+    for (let i = 0; i < 5; i++) { const line = box(0.22 - i * 0.012, 0.006, 0.008, C.mats.ink); line.position.set(0.13, 0.028, -0.06 + i * 0.055); g.add(line); }
+  } else {
+    const cover = box(0.32, 0.055, 0.42, C.mats.notebook); g.add(cover);
+    const pages = box(0.29, 0.045, 0.39, C.mats.letterPaper); pages.position.x = 0.012; pages.position.y = 0.012; g.add(pages);
+    const band = box(0.025, 0.062, 0.43, C.mats.darkwood); band.position.x = -0.12; g.add(band);
+  }
+  g.position.set(px, id === "m6" ? 0.76 : 0.38, pz); g.rotation.y = 0.18;
+  g.userData.interactY = g.position.y; C.g.add(g); return g;
+}
+
 /* ---------- 家財のひとそろい ---------- */
 
 const FURNISH = {
   // 台所と茶の間（ふつうの住まい）
   kitchen(C) {
     const { mats, dx, x0, x1, z0, z1, zMid, H } = C;
-    C.pb(1.7, 0.85, 0.6, mats.steel, x0 + 1.0, 0.43, z0 - 0.9);
-    C.blk(x0 + 0.15, z0 - 1.2, x0 + 1.85, z0 - 0.6);
     C.pb(1.7, 0.6, 0.35, mats.wood, x0 + 1.0, 1.72, z0 - 0.75);
-    // 冷蔵庫
-    C.pb(0.62, 1.5, 0.6, mats.appliance, x1 - 0.5, 0.75, z0 - 0.7);
-    C.blk(x1 - 0.85, z0 - 1.05, x1 - 0.15, z0 - 0.35);
     // 靴箱
     C.pb(0.9, 0.75, 0.35, mats.wood, x1 - 0.6, 0.38, z0 - 2.5);
     C.blk(x1 - 1.1, z0 - 2.7, x1 - 0.1, z0 - 2.3);
     // 靴箱の上。ここに懐中電灯や鍵を置きます
-    C.itemAt = [x1 - 0.6, z0 - 2.05];
-    C.pb(0.07, 0.07, 0.2, mats.steel, x1 - 0.6, 0.79, z0 - 2.5);
+    C.itemAt = [x1 - 0.6, z0 - 2.48];
     // 押し入れ
     C.pb(1.8, H, 0.5, mats.wood, x1 - 1.1, H / 2, z1 + 0.26);
     C.blk(x1 - 2.0, z1, x1 - 0.2, z1 + 0.5);
@@ -438,10 +597,7 @@ const FURNISH = {
     C.blk(x1 - 1.0, zMid - 0.85, x1 - 0.2, zMid - 0.35);
     const mir = C.wall(0.55, 0.7, mats.mirror, x1 - 0.05, 1.45, zMid - 0.6, -Math.PI / 2);
     addGhost(C, mir, x1 - 0.12, 1.35, zMid - 0.6, -Math.PI / 2, 0.5, 1.0);
-    // 風呂の扉
-    C.pb(0.85, 1.85, 0.07, mats.frostglass, dx, 0.93, z1 + 0.06);
-    C.pb(0.95, 1.95, 0.05, mats.steel, dx, 0.97, z1 + 0.02);
-    C.blk(dx - 0.5, z1, dx + 0.5, z1 + 0.12);
+    // 共通の浴室を使うため、この型は脱衣所の生活感だけを足す。
     C.fx.push({ kind: "water", x: dx, z: z1 + 0.8 });
     C.detailAt = [dx, z1 + 0.85];
   },
@@ -613,7 +769,7 @@ const FURNISH = {
     // 文机の上に、封を切っていない手紙
     C.pb(0.95, 0.32, 0.5, mats.darkwood, dx, 0.16, zMid - 1.4);
     C.blk(dx - 0.55, zMid - 1.7, dx + 0.55, zMid - 1.1);
-    const env = C.pb(0.24, 0.02, 0.16, mats.envelope, dx, 0.33, zMid - 1.4, 0.12);
+    C.memoAt = [dx, zMid - 1.4];
     C.pb(0.6, 0.09, 0.6, mats.cushion, dx, 0.05, zMid - 2.1);
     // 布団のふくらみ
     C.pb(1.15, 0.09, 1.9, mats.futon, x1 - 1.1, 0.05, z1 + 1.2);
@@ -631,12 +787,10 @@ const FURNISH = {
   // 五〇四号室（自宅）
   home(C) {
     const { mats, dx, x0, x1, z1, zMid, H } = C;
-    C.pb(1.7, 0.85, 0.6, mats.steel, x1 - 1.0, 0.43, C.z0 - 0.9);
-    C.blk(x1 - 1.85, C.z0 - 1.2, x1 - 0.15, C.z0 - 0.6);
     // 母の机（ノートが置いてある）
     C.pb(1.0, 0.7, 0.5, mats.wood, x0 + 1.0, 0.35, z1 + 0.8);
     C.blk(x0 + 0.4, z1 + 0.5, x0 + 1.6, z1 + 1.1);
-    const nb = C.pb(0.22, 0.04, 0.3, mats.notebook, x0 + 1.0, 0.73, z1 + 0.8, 0.2);
+    C.goalAt = [x0 + 1.0, z1 + 0.8];
     // 押し入れ・ちゃぶ台・座布団
     C.pb(1.8, H, 0.5, mats.wood, x1 - 1.1, H / 2, z1 + 0.26);
     C.blk(x1 - 2.0, z1, x1 - 0.2, z1 + 0.5);
@@ -825,6 +979,7 @@ export function buildFloor(scene, floorDef, opt) {
     fstair: lam({ map: TX.floorStair(2, 2) }),
     ceil: lam({ map: TX.ceilingPaint(Math.round(LEN / 4), 1) }),
     steel: lam({ map: TX.paintedSteel(), color: 0x9aa0a0 }),
+    darksteel: lam({ color: 0x34383a }),
     paper: lam({ map: TX.wallpaper(2, 1) }),
     tatami: lam({ map: TX.tatami(2, 2) }),
     tile: lam({ map: TX.tileWall(2, 2) }),
@@ -843,6 +998,8 @@ export function buildFloor(scene, floorDef, opt) {
     cushion: lam({ color: 0x5a3f42 }),
     cardboard: lam({ map: TX.cardboard() }),
     appliance: lam({ color: 0x9aa0a2 }),
+    fridgeDoor: lam({ color: 0xb8b9b5 }),
+    fridgeInside: new THREE.MeshBasicMaterial({ color: 0xb8d4d0 }),
     satchel: lam({ color: 0x7a2028 }),
     scar: lam({ color: 0x2a2018 }),
     scribble: lam({ map: TX.scribble(), transparent: true }),
@@ -851,6 +1008,7 @@ export function buildFloor(scene, floorDef, opt) {
     bag: lam({ color: 0x22242a }),
     porcelain: lam({ color: 0xc9c6bc }),
     mirror: lam({ map: TX.mirrorGlass() }),
+    mirrorSmear: new THREE.MeshBasicMaterial({ map: TX.mirrorSmear(), transparent: true, depthWrite: false }),
     shade: lam({ color: 0xcdc6b2 }),
     cord: lam({ color: 0xb8b2a2 }),
     calendar: lam({ map: TX.calendar() }),
@@ -859,12 +1017,22 @@ export function buildFloor(scene, floorDef, opt) {
     curtain: lam({ color: 0x6e6656 }),
     newspaper: lam({ color: 0xbdb49c }),
     frostglass: lam({ color: 0x8f9aa0 }),
+    rustedSteel: lam({ color: 0x4d4b46 }),
+    drain: lam({ color: 0x242729 }),
+    wetHair: new THREE.MeshBasicMaterial({ color: 0x07080a }),
+    damp: new THREE.MeshBasicMaterial({ map: TX.dampStain(), transparent: true, opacity: 0.74, depthWrite: false }),
     driedStem: lam({ color: 0x4a4230 }),
     eye: new THREE.MeshBasicMaterial({ color: 0xd8dcc8 }),
     plush: lam({ color: 0x8d6f52 }),
     tvScreen: new THREE.MeshBasicMaterial({ map: TX.tvStatic() }),
     notice: lam({ map: TX.poster(["住民各位", "夜間の物音について", "心当たりのある方は", "管理人室まで"]) }),
     envelope: lam({ color: 0xd8d2c0 }),
+    letterPaper: lam({ color: 0xe6dfcc }),
+    ink: new THREE.MeshBasicMaterial({ color: 0x39352f }),
+    key: lam({ color: 0xb89442 }),
+    keyTag: lam({ color: 0x6a1820 }),
+    lens: new THREE.MeshBasicMaterial({ color: 0xdbe8dc }),
+    switchMat: lam({ color: 0x781d22 }),
     futon: lam({ color: 0xa8a196 }),
     futon2: lam({ color: 0x7d7a72 }),
     pillow: lam({ color: 0xbdb6a8 }),
@@ -962,9 +1130,7 @@ export function buildFloor(scene, floorDef, opt) {
       kind: "door", door: rec, label: canEnter ? "開ける" : "調べる",
     });
 
-    // 「それ」が出る階では、いくつかの扉をはじめから開けておく。
-    // 逃げこむ先がないと、突き当りで詰んでしまうため。
-    rec.startOpen = Boolean(floorDef.entity) && (i === 1 || i === 3);
+    // 階へ着いた瞬間は全戸を閉め、扉の変化は歩き始めてから怪異として見せる。
 
     if (canEnter) {
       // 中身は、扉を開けたときにはじめて組み立てます（開けない部屋のぶんは作りません）
@@ -1175,27 +1341,27 @@ export function buildEntity() {
   headPivot.position.y = 1.795;
   g.add(headPivot);
 
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 12), skin);
-  skull.scale.set(1, 1.18, 0.95);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.137, 16, 14), skin);
+  skull.scale.set(1.02, 1.28, 0.90);
   headPivot.add(skull);
 
   // 顔。暗くても、うっすら見えるように光らせておく
   const faceMat = new THREE.MeshBasicMaterial({
     map: TX.face(), transparent: true, opacity: 0.95, depthWrite: false,
   });
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.235, 0.29), faceMat);
-  face.position.set(0, -0.022, 0.152);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.285, 0.375), faceMat);
+  face.position.set(0, -0.045, 0.171);
   headPivot.add(face);
 
   // 髪。頭から胸の下まで、房になって垂れる
   const hairMat = new THREE.MeshLambertMaterial({
     map: TX.hair(), color: 0x32323b, transparent: true, side: THREE.FrontSide, depthWrite: false,
   });
-  const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.134, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.92), hairMat);
-  hairTop.scale.set(1.02, 1.20, 1.02);
+  const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.158, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.92), hairMat);
+  hairTop.scale.set(1.02, 1.22, 1.02);
   headPivot.add(hairTop);
 
-  const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.142, 0.20, 0.80, 18, 1, true), hairMat);
+  const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.162, 0.22, 0.88, 18, 1, true), hairMat);
   veil.position.y = -0.50;
   headPivot.add(veil);
 
@@ -1204,8 +1370,8 @@ export function buildEntity() {
   const bangMat = new THREE.MeshLambertMaterial({
     map: TX.hairFront(), color: 0x4a4a55, transparent: true, side: THREE.FrontSide, depthWrite: false,
   });
-  const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.92), bangMat);
-  bang.position.set(0, -0.275, 0.152);
+  const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.50, 0.98), bangMat);
+  bang.position.set(0, -0.295, 0.176);
   headPivot.add(bang);
 
   // この一体だけ、別の層で照らす（懐中電灯で白飛びさせないため）

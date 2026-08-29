@@ -296,17 +296,6 @@ export class Game {
     this.popT = 10 + Math.random() * 18;
     this.dripT = 0;
 
-    // はじめから開いている扉（逃げこむ先）を、ここで開けておく
-    this.floor.doors.forEach((d) => {
-      if (!d.startOpen || !d.canEnter) return;
-      if (d.build) d.build();
-      d.open = true;
-      this.floor.col.remove(d.col);
-      d.pivot.rotation.y = -1.95;
-      const it = this.floor.inter.find((i) => i.kind === "door" && i.door === d);
-      if (it) it.label = "閉める";
-    });
-
     this.snd.buzzOff();
     if (!def.lightsOut) this.snd.buzzOn(def.flicker ? 0.045 : 0.022);
 
@@ -372,7 +361,7 @@ export class Game {
       // 廊下を、誰かが通っていく
       this.passT -= dt;
       if (this.passT <= 0) {
-        this.passT = 22 + Math.random() * 30;
+        this.passT = 40 + Math.random() * 32;
         this.snd.passBy();
         if (Math.random() < 0.55) this.ui.say("……廊下を、誰かが通った。");
       }
@@ -420,10 +409,21 @@ export class Game {
     f.lights.forEach((L) => {
       if (L.dead && !L.flicker) return;
       if (L.flicker) {
-        const n = Math.sin(performance.now() * 0.011) * Math.sin(performance.now() * 0.0031);
-        const on2 = n > -0.15 && Math.random() > 0.02;
-        L.light.intensity = on2 ? L.base * (0.6 + Math.random() * 0.5) : 0;
-        L.tube.material.color.setHex(on2 ? 0xd8e6d8 : 0x121512);
+        // 常時ちらつくと慣れてしまうため、長い静けさの後に二度だけ短く瞬かせる。
+        if (L.flickerWait == null) L.flickerWait = 24 + Math.random() * 34;
+        if (L.flickerBurst > 0) {
+          L.flickerBurst -= dt;
+          const on2 = Math.floor(L.flickerBurst * 22) % 2 === 0;
+          L.light.intensity = on2 ? L.base * 0.82 : 0;
+          L.tube.material.color.setHex(on2 ? 0xd8e6d8 : 0x121512);
+          if (L.flickerBurst <= 0) {
+            L.light.intensity = L.base; L.tube.material.color.setHex(0xd8e6d8);
+            L.flickerWait = 32 + Math.random() * 48;
+          }
+        } else {
+          L.flickerWait -= dt;
+          if (L.flickerWait <= 0) { L.flickerBurst = 0.24 + Math.random() * 0.12; this.snd.tubePop(); }
+        }
       }
     });
 
@@ -519,13 +519,13 @@ export class Game {
     if (room.kind === "tv") this.snd.crtOn();
 
     // 廊下を誰かが通る音（部屋にいるあいだ）
-    this.passT = 9 + Math.random() * 14;
+    this.passT = 24 + Math.random() * 26;
 
     // 出たときに靴が増えている用の仕込み
     if (this.state.floor >= 2) this.haunt.armShoes();
 
     // まれに、扉がひとりでに閉まる
-    if (!d.slammed && this.state.floor >= 2 && Math.random() < 0.22) {
+    if (!d.slammed && this.state.floor >= 2 && Math.random() < 0.07) {
       d.slammed = true;
       this.slamT = 2.6 + Math.random() * 3.4;
       this.slamDoor = d;
@@ -544,6 +544,15 @@ export class Game {
 
   // 部屋の中の「調べる」に付いているしかけ
   _detailScare(it) {
+    if (it.scare === "fridge" && it.fixture) {
+      const f = it.fixture;
+      f.open = !f.open;
+      this._swingTo(f.pivot, f.open ? f.opened : 0);
+      f.inside.visible = f.open;
+      it.label = f.open ? "冷蔵庫を閉める" : "冷蔵庫を開ける";
+      if (f.open) this.snd.doorOpen(); else this.snd.doorShut();
+      return;
+    }
     // まず、触ったものの音
     const kind = this.curRoom && this.curRoom.room ? this.curRoom.room.kind : "";
     if (kind === "boxes" || kind === "storage" || kind === "office" || kind === "child") this.snd.drawer();
@@ -802,8 +811,26 @@ export class Game {
       return;
     }
 
+    if (it.kind === "fixtureDoor") {
+      const d = it.door;
+      d.open = !d.open;
+      if (d.open) {
+        this.snd.doorOpen();
+        if (d.col) { this.floor.col.remove(d.col); d.col = null; }
+        this._swingTo(d.pivot, d.opened);
+        it.label = it.label.replace("開ける", "閉める");
+      } else {
+        this.snd.doorShut();
+        const p2 = d.pivot.position;
+        d.col = this.floor.col.add(p2.x - 0.05, p2.z, p2.x + 0.05, p2.z + d.width, "fixtureDoor");
+        this._swingTo(d.pivot, d.shut);
+        it.label = it.label.replace("閉める", "開ける");
+      }
+      return;
+    }
+
     if (it.kind === "detail") {
-      it.done = true;
+      if (!it.repeat) it.done = true;
       this.ui.sayNow(it.say);
       this._detailScare(it);
       return;
@@ -811,6 +838,7 @@ export class Game {
 
     if (it.kind === "memo" || it.kind === "goal") {
       it.done = true;
+      if (it.prop) it.prop.visible = false;
       if (this.state.memos.indexOf(it.id) < 0) this.state.memos.push(it.id);
       if (it.id === "m5") this.state.flags.loopBroken = true;
       this.ui.showMemo(it.id);
@@ -824,6 +852,7 @@ export class Game {
 
     if (it.kind === "item") {
       it.done = true;
+      if (it.prop) it.prop.visible = false;
       const info = S.ITEMS[it.id];
       if (it.id === "battery") {
         p.spare += 1;

@@ -1,6 +1,6 @@
 // ============================================================
 //  怪奇現象（各階でひとりでに起きること）
-//   ・階ごとに時計を持ち、30〜55秒に一度、起こせるものを一つ選びます。
+//   ・階ごとに時計を持ち、55〜95秒に一度、起こせるものを一つ選びます。
 //   ・作った物は floor.group にぶら下げるので、階を移ると一緒に消えます。
 //   ・同じことが二度つづかないように、直前の一つは選びません。
 // ============================================================
@@ -44,15 +44,17 @@ export class Haunts {
     this.last = "";
     this.shoeArmed = false;
     this.shoesDone = new Set();
+    this.passed = new Map();
   }
 
   // 階を組み立てたあとに呼びます
   reset() {
     this.live.length = 0;
-    this.t = rnd(20, 34);
+    this.t = rnd(35, 58);
     this.last = "";
     this.shoeArmed = false;
     this.shoesDone = new Set();
+    this.passed = new Map();
   }
 
   /* ---------------- 進行 ---------------- */
@@ -61,6 +63,18 @@ export class Haunts {
     const g = this.g;
     if (!g.floor) return;
     if (g.versus && g.versus.on) return;
+
+    // 廊下ですれ違った扉を覚え、入室後に「さっきの扉」だけを変化させられるようにする。
+    if (!g.player.inUnit) {
+      for (const d of g.floor.doors) {
+        const dist = Math.abs(d.dx - g.player.pos.x);
+        if (dist < 1.25) this.passed.set(d, 0);
+      }
+    }
+    for (const [d, age] of this.passed) {
+      const next = age + dt;
+      if (next > 120) this.passed.delete(d); else this.passed.set(d, next);
+    }
 
     // 進行中のものを進める
     for (let i = this.live.length - 1; i >= 0; i--) {
@@ -75,12 +89,13 @@ export class Haunts {
 
     this.t -= dt;
     if (this.t > 0) return;
-    this.t = rnd(30, 55);
+    this.t = rnd(55, 95);
     this._fire();
   }
 
   _fire() {
-    const all = ["pot", "blood", "sway", "opens", "roomLight", "outage"];
+    // 扉の異変を多めにし、物が落ちる現象は候補を一つだけにして頻度を抑える。
+    const all = ["opens", "opens", "passedOpens", "passedOpens", "sway", "roomLight", "blood", "pot", "outage"];
     const able = all.filter((k) => k !== this.last && this._can(k));
     if (!able.length) { this.t = 8; return; }
     const k = pick(able);
@@ -89,6 +104,7 @@ export class Haunts {
     else if (k === "blood") this._blood();
     else if (k === "sway") this._sway();
     else if (k === "opens") this._opens();
+    else if (k === "passedOpens") this._passedOpens();
     else if (k === "roomLight") this._roomLight();
     else this._outage();
   }
@@ -99,7 +115,8 @@ export class Haunts {
     if (kind === "pot") return inUnit && Boolean(g.curRoom && g.curRoom.unitBounds);
     if (kind === "blood") return true;
     if (kind === "sway") return !inUnit && this._farDoors(3.5, 15, false).length > 0;
-    if (kind === "opens") return !inUnit && this._farDoors(5, 16, true).length > 0;
+    if (kind === "opens") return !inUnit && this._farDoors(3.5, 10, true).length > 0;
+    if (kind === "passedOpens") return inUnit && this._passedDoors().length > 0;
     if (kind === "roomLight") return !inUnit && this._farDoors(4, 18, false).length > 0;
     if (kind === "outage") return !inUnit && g.floor.lights.some((L) => !L.dead);
     return false;
@@ -108,12 +125,21 @@ export class Haunts {
   // 主人公から離れた、閉じている扉
   _farDoors(near, far, mustEnter) {
     const px = this.g.player.pos.x;
+    const fx = this.g.player.forward().x;
     return this.g.floor.doors.filter((d) => {
       if (d.open || d.busy) return false;
       if (mustEnter && !d.canEnter) return false;
       const dist = Math.abs(d.dx - px);
-      return dist > near && dist < far;
+      const ahead = (d.dx - px) * fx;
+      return dist > near && dist < far && ahead > 0.5;
     });
+  }
+
+  _passedDoors() {
+    const cur = this.g.curRoom;
+    return Array.from(this.passed.entries()).filter(([d, age]) => {
+      return d !== cur && age > 2 && age < 75 && d.canEnter && !d.open && !d.busy;
+    }).map(([d]) => d);
   }
 
   _add(o) {
@@ -231,7 +257,7 @@ export class Haunts {
     this.shoeArmed = false;
     const key = rec.no + ":" + rec.dx.toFixed(1);
     if (this.shoesDone.has(key)) return;
-    if (Math.random() > 0.5) return;
+    if (Math.random() > 0.14 || this.shoesDone.size > 0) return;
     this.shoesDone.add(key);
 
     const g = this.g;
@@ -326,10 +352,33 @@ export class Haunts {
     g.ui.say("……どこかの扉が、揺れている。");
   }
 
-  // 勝手に部屋の扉が開く
+  // 数メートル前の扉が、隙間だけを残してゆっくり開き、しばらくして閉じる
   _opens() {
     const g = this.g;
-    const d = pick(this._farDoors(5, 16, true));
+    const d = pick(this._farDoors(3.5, 10, true));
+    if (!d) return;
+    d.busy = true;
+    let creaked = false;
+
+    this._add({
+      life: rnd(11, 16),
+      step: (e) => {
+        if (d.open) { e.life = 0; return; }
+        let k;
+        if (e.t < 3.8) k = e.t / 3.8;
+        else if (e.t < e.life - 2.8) k = 1;
+        else k = Math.max(0, (e.life - e.t) / 2.8);
+        d.pivot.rotation.y = -0.42 * (1 - Math.pow(1 - k, 2.2));
+        if (!creaked && e.t > 1.1) { creaked = true; g.snd.creakFloor(); }
+      },
+      end: () => { if (!d.open) d.pivot.rotation.y = 0; d.busy = false; },
+    });
+  }
+
+  // 部屋にいるあいだ、すでに通り過ぎた扉を開けておき、戻ったときに気づかせる
+  _passedOpens() {
+    const g = this.g;
+    const d = pick(this._passedDoors());
     if (!d) return;
     d.busy = true;
     if (d.build) d.build();
@@ -337,18 +386,23 @@ export class Haunts {
     g.floor.col.remove(d.col);
     const it = g.floor.inter.find((i) => i.kind === "door" && i.door === d);
     if (it) it.label = "閉める";
-    g.snd.doorOpen();
-    g.ui.hit();
-    g.ui.sayNow("——" + d.no + "号室の扉が、ひとりでに開いた。");
-
+    this.passed.delete(d);
     this._add({
-      life: 2.6,
+      life: rnd(28, 44),
       step: (e) => {
-        if (!d.open) return;   // 主人公が閉めたなら、そのまま
-        const k = Math.min(1, e.t / 2.6);
-        d.pivot.rotation.y = -1.95 * (1 - Math.pow(1 - k, 2.4));
+        if (!d.open) { e.life = 0; return; }
+        const k = Math.min(1, e.t / 4.8);
+        d.pivot.rotation.y = -1.05 * (1 - Math.pow(1 - k, 2.1));
       },
-      end: () => { if (d.open) d.pivot.rotation.y = -1.95; d.busy = false; },
+      end: () => {
+        if (d.open) {
+          d.open = false;
+          d.col = g.floor.col.add(d.dx - D.DOOR_W / 2, D.CORR_Z0 - 0.1, d.dx + D.DOOR_W / 2, D.CORR_Z0 + 0.06, "door");
+          d.pivot.rotation.y = 0;
+          if (it) it.label = "開ける";
+        }
+        d.busy = false;
+      },
     });
   }
 
@@ -396,32 +450,18 @@ export class Haunts {
     });
   }
 
-  // 廊下の灯りが急に消える → 時間差でまた点く
+  // 廊下の灯りが二度だけ短く消える。長い停電は繰り返すと驚きより待ち時間になるため避ける
   _outage() {
     const g = this.g;
     const live = g.floor.lights.filter((L) => !L.dead);
     if (!live.length) return;
     const memo = live.map((L) => ({ L, flicker: L.flicker }));
-    memo.forEach((r) => {
-      r.L.dead = true; r.L.flicker = false;
-      r.L.light.intensity = 0;
-      r.L.tube.material.color.setHex(0x121512);
-    });
-    g.snd.tubePop();
-    g.snd.buzzOff();
-    g.ui.hit();
-    g.ui.sayNow("——灯りが、消えた。");
-
-    const wait = rnd(5, 9);
     this._add({
-      life: wait + 1.2,
+      life: 0.72,
       step: (e) => {
-        if (e.t < wait) return;
-        // 戻りぎわに、二度ばたつく
-        const k = (e.t - wait) / 1.2;
-        const on = k > 0.15 && (k > 0.55 || Math.random() > 0.4);
+        const on = !((e.t > 0.08 && e.t < 0.19) || (e.t > 0.34 && e.t < 0.52));
         memo.forEach((r) => {
-          r.L.light.intensity = on ? r.L.base * rnd(0.6, 1) : 0;
+          r.L.light.intensity = on ? r.L.base : 0;
           r.L.tube.material.color.setHex(on ? 0xd8e6d8 : 0x121512);
         });
       },
@@ -433,8 +473,8 @@ export class Haunts {
         });
         g.snd.tubePop();
         if (!g.def.lightsOut) g.snd.buzzOn(g.def.flicker ? 0.045 : 0.022);
-        g.ui.say("……また、点いた。");
       },
     });
+    g.snd.tubePop();
   }
 }

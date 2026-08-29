@@ -596,6 +596,47 @@ export function bloodStain() {
   cache.set(key, t);
   return t;
 }
+
+// 水回りの鏡につく曇りと指跡。鏡面そのものを濁らせず重ねることで、
+// 人影の怪異が出たときにも輪郭だけは読めるようにする。
+export function mirrorSmear() {
+  const key = "mirrorSmear";
+  if (cache.has(key)) return cache.get(key);
+  const c = cv(256, 384), g = c.getContext("2d");
+  g.clearRect(0, 0, 256, 384);
+  const fog = g.createRadialGradient(132, 178, 20, 132, 178, 150);
+  fog.addColorStop(0, "rgba(205,214,210,0.05)");
+  fog.addColorStop(0.65, "rgba(185,196,192,0.20)");
+  fog.addColorStop(1, "rgba(120,130,128,0.03)");
+  g.fillStyle = fog; g.fillRect(0, 0, 256, 384);
+  g.strokeStyle = "rgba(225,230,224,0.26)"; g.lineCap = "round";
+  for (let i = 0; i < 5; i++) {
+    g.lineWidth = 5 - i * 0.55;
+    g.beginPath(); g.moveTo(74 + i * 18, 250 + (i % 2) * 7);
+    g.bezierCurveTo(68 + i * 18, 210, 78 + i * 17, 162, 72 + i * 20, 124); g.stroke();
+  }
+  g.lineWidth = 7; g.beginPath(); g.arc(111, 259, 39, 0.1, Math.PI * 0.92); g.stroke();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t); return t;
+}
+
+// 便器の根元へ広がる乾ききらない染み。血色にせず、水なのか別のものかを曖昧にする。
+export function dampStain() {
+  const key = "dampStain";
+  if (cache.has(key)) return cache.get(key);
+  const c = cv(256, 256), g = c.getContext("2d");
+  g.clearRect(0, 0, 256, 256);
+  for (let i = 0; i < 18; i++) {
+    const x = 128 + (Math.random() - 0.5) * 115;
+    const y = 128 + (Math.random() - 0.5) * 130;
+    const r = 18 + Math.random() * 50;
+    const q = g.createRadialGradient(x, y, 2, x, y, r);
+    q.addColorStop(0, "rgba(24,31,29,0.18)"); q.addColorStop(1, "rgba(24,31,29,0)");
+    g.fillStyle = q; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t); return t;
+}
 // 名札（頭の上に浮かぶ）
 export function nameTag(name) {
   const key = "tag:" + name;
@@ -670,7 +711,8 @@ export function hairFront() {
 
   /* 2) 顔を抜く。分け目の切れ込みも入れる */
   g.globalCompositeOperation = "destination-out";
-  g.beginPath(); g.ellipse(CX, HY + 30, 68, 100, 0, 0, 7); g.fill();
+  // 顔を怖さの主役にするため、目と裂けた口まで隠れない広さで中央を抜く。
+  g.beginPath(); g.ellipse(CX, HY + 40, 82, 132, 0, 0, 7); g.fill();
   g.beginPath();
   g.moveTo(CX - 11, -10); g.lineTo(CX + 11, -10);
   g.quadraticCurveTo(CX + 5, 40, CX + 3, 74);
@@ -711,12 +753,12 @@ export function hairFront() {
       330 + Math.random() * 130, 7 + Math.random() * 13,
       3 + Math.random() * 14, 26 + Math.random() * 16);
   }
-  // 分け目のきわに、細い後れ毛
-  for (let i = 0; i < 8; i++) {
+  // 濡れた後れ毛は頬の端だけへ落とし、目と口の中央には掛けない。
+  for (let i = 0; i < 4; i++) {
     const side = i % 2 === 0 ? -1 : 1;
-    lock(CX + side * (10 + Math.random() * 26), 10 + Math.random() * 30, side,
-      90 + Math.random() * 130, 2 + Math.random() * 3.5,
-      12 + Math.random() * 24, 36 + Math.random() * 16);
+    lock(CX + side * (46 + Math.random() * 18), 18 + Math.random() * 28, side,
+      110 + Math.random() * 150, 1.5 + Math.random() * 2.5,
+      8 + Math.random() * 18, 34 + Math.random() * 14);
   }
   // 塊の上にも、房の筋を重ねて質感を出す（頭からはみ出して角にならない位置から）
   for (let i = 0; i < 22; i++) {
@@ -759,8 +801,8 @@ export function face() {
   g.clearRect(0, 0, S, H);
 
   const cx = S / 2, cy = H * 0.47;
-  const FW = 76;
-  const EY = cy - 20, EX = 31;
+  const FW = 82;
+  const EY = cy - 26, EX = 34;
 
   const smudge = (x, y, w, h, a, col, op) => {
     const q = g.createRadialGradient(x, y, 1, x, y, Math.max(w, h));
@@ -775,9 +817,9 @@ export function face() {
 
   /* --- 面。中央だけ明るく、ふちは闇へ落とす --- */
   const skin = g.createRadialGradient(cx, cy - 26, 8, cx, cy + 4, 118);
-  skin.addColorStop(0, "rgba(180,176,170,1)");
-  skin.addColorStop(0.38, "rgba(156,152,146,1)");
-  skin.addColorStop(0.68, "rgba(104,101,98,0.94)");
+  skin.addColorStop(0, "rgba(218,216,211,1)");
+  skin.addColorStop(0.38, "rgba(186,183,178,1)");
+  skin.addColorStop(0.68, "rgba(112,109,106,0.96)");
   skin.addColorStop(0.87, "rgba(44,44,46,0.6)");
   skin.addColorStop(1, "rgba(16,16,18,0)");
   g.fillStyle = skin;
@@ -820,8 +862,15 @@ export function face() {
     g.fillStyle = "rgba(240,240,236,0.6)";
     g.beginPath(); g.arc(ex + look - w * 0.22, ey - h * 0.32, 1.9, 0, 7); g.fill();
   };
-  eye(cx - EX, EY, 13.5, 9.5, 1.8, 0.06);
-  eye(cx + EX + 1, EY - 3, 12.5, 10.5, -1.4, 0.0);
+  eye(cx - EX, EY, 17.5, 13.5, 3.6, 0.06);
+  eye(cx + EX + 1, EY - 4, 16.5, 14.5, -3.2, 0.0);
+
+  // 黒い涙は髪と見分けがつかない細さにし、目から何かが染み出した印象だけ残す。
+  g.strokeStyle = "rgba(2,2,5,0.72)"; g.lineCap = "round";
+  [[cx - EX - 8, EY + 10, -4], [cx - EX + 7, EY + 12, 5], [cx + EX - 5, EY + 9, -6]].forEach(([x, y, bend], i) => {
+    g.lineWidth = i === 1 ? 2.4 : 1.4;
+    g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + bend, y + 34, x - bend, y + 54, x + bend * 0.4, y + 82); g.stroke();
+  });
 
   // 眉
   g.strokeStyle = "rgba(6,6,10,0.75)"; g.lineWidth = 3.6; g.lineCap = "round";
@@ -837,17 +886,33 @@ export function face() {
   g.beginPath(); g.ellipse(cx - 7.5, cy + 36, 5, 3.6, 0.25, 0, 7); g.fill();
   g.beginPath(); g.ellipse(cx + 7.5, cy + 36, 5, 3.6, -0.25, 0, 7); g.fill();
 
-  /* --- 口。大きく、暗く、ゆがんで --- */
-  smudge(cx, cy + 70, 34, 26, 0, "0,0,0", 0.55);
+  /* --- 口。顎まで縦に裂け、奥行きのない黒が穴のように残る --- */
+  smudge(cx, cy + 76, 43, 55, 0, "0,0,0", 0.72);
   g.fillStyle = "rgba(0,0,0,0.97)";
   g.beginPath();
-  g.moveTo(cx - 21, cy + 56);
-  g.quadraticCurveTo(cx - 2, cy + 48, cx + 20, cy + 58);
-  g.quadraticCurveTo(cx + 17, cy + 88, cx - 3, cy + 94);
-  g.quadraticCurveTo(cx - 19, cy + 86, cx - 21, cy + 56);
+  g.moveTo(cx - 25, cy + 48);
+  g.quadraticCurveTo(cx - 2, cy + 35, cx + 23, cy + 51);
+  g.quadraticCurveTo(cx + 31, cy + 85, cx + 12, cy + 119);
+  g.quadraticCurveTo(cx - 2, cy + 136, cx - 17, cy + 116);
+  g.quadraticCurveTo(cx - 34, cy + 82, cx - 25, cy + 48);
   g.closePath(); g.fill();
-  g.fillStyle = "rgba(168,164,158,0.4)";
-  g.beginPath(); g.ellipse(cx - 1, cy + 100, 15, 5, 0, 0, 7); g.fill();
+
+  // 歯は整列させず、長さと傾きをずらす。規則正しい歯並びより生き物らしさが消えるため。
+  g.fillStyle = "rgba(205,202,188,0.88)";
+  for (let i = 0; i < 8; i++) {
+    const x = cx - 20 + i * 5.8;
+    const h = 9 + (i % 3) * 3;
+    g.beginPath();
+    g.moveTo(x - 3, cy + 56 + (i % 2)); g.lineTo(x + 3, cy + 55); g.lineTo(x + (i % 2 ? 1 : -1), cy + 55 + h); g.closePath(); g.fill();
+  }
+  for (let i = 0; i < 7; i++) {
+    const x = cx - 17 + i * 5.8;
+    const h = 8 + ((i + 1) % 3) * 3;
+    g.beginPath();
+    g.moveTo(x - 3, cy + 111); g.lineTo(x + 3, cy + 112); g.lineTo(x + (i % 2 ? -1 : 1), cy + 111 - h); g.closePath(); g.fill();
+  }
+  g.fillStyle = "rgba(80,28,30,0.42)";
+  g.beginPath(); g.ellipse(cx - 1, cy + 121, 16, 7, 0, 0, 7); g.fill();
 
   /* --- ひび割れ --- */
   const crack = (x0, y0, dir, len, w, depth) => {
@@ -873,6 +938,17 @@ export function face() {
   for (let i = 0; i < 14; i++) {
     const a = Math.random() * 6.283, r = 26 + Math.random() * 58;
     crack(cx + Math.cos(a) * r * 0.78, cy + Math.sin(a) * r, Math.random() * 6.283, 6 + Math.random() * 12, 0.5, 0);
+  }
+
+  // 顔と髪を馴染ませる線も頬の外側だけに置き、目と口の形は必ず読めるようにする。
+  g.strokeStyle = "rgba(5,5,8,0.9)"; g.lineCap = "round";
+  for (let i = 0; i < 4; i++) {
+    const side = i % 2 ? 1 : -1;
+    const x = cx + side * (58 + Math.random() * 11);
+    g.lineWidth = 1.0 + Math.random() * 1.8;
+    g.beginPath(); g.moveTo(x, cy - 105);
+    g.bezierCurveTo(x - side * 9, cy - 30, x + side * 5, cy + 48, x - side * 4, cy + 122);
+    g.stroke();
   }
 
   grain(g, S, H, 13);

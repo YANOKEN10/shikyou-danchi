@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /.devdata/
+
+Sitemap: https://shikyou-danchi.vercel.app/sitemap.xml
