@@ -416,6 +416,7 @@ export class Game {
     if (this.versus && this.versus.on) {
       this.versus.update(dt);
       this._interact();
+      this.ui.setObjective("");
       this.ui.setBattery(p.battery, p.hasLight);
       this.ui.setStamina(p.stamina);
       this.ui.tickSub(dt);
@@ -451,6 +452,7 @@ export class Game {
 
     this.ui.setBattery(p.battery, p.hasLight);
     this.ui.setStamina(p.stamina);
+    this.ui.setObjective(S.currentGoal(this.state).now);
     this.ui.tickSub(dt);
 
     // 帳面・ポーズ
@@ -846,6 +848,7 @@ export class Game {
       if (this._stairBlocked()) {
         this.snd.locked();
         this.ui.sayNow(this.def.stairHint || "上れない。");
+        this.ui.say("——" + S.currentGoal(this.state).now + "。（休 → こまったときは、で詳しく）");
         return;
       }
       await this._goUp();
@@ -1047,6 +1050,12 @@ export class Game {
       stat.textContent = S.FLOORS[this.state.floor - 1].title + "　／　見つけたもの " + this.state.memos.length + " / " + S.MEMO_ORDER.length + "　／　" + fmtTime(this.state.seconds);
       body.appendChild(stat);
 
+      // いま何をすればいいか。ここで詰まらせない
+      const goal = document.createElement("p");
+      goal.className = "goalnow";
+      goal.textContent = "▸ " + S.currentGoal(this.state).now;
+      body.appendChild(goal);
+
       const mk = (label, cls, fn) => {
         const b = document.createElement("button");
         b.className = cls;
@@ -1070,6 +1079,7 @@ export class Game {
         await this.save();
         b.disabled = false; b.textContent = "いま記録する";
       });
+      mk("こまったときは（やり方とヒント）", "ghost", () => this._hintPanel());
       mk("持ち物とメモ", "ghost", () => { this.ui.closePause(); this._openBook(); });
       mk("音のたしかめ", "ghost", () => this._soundPanel());
       mk("友達と遊ぶ（鬼ごっこ）", "ghost", () => { this.ui.closePause(); if (this.onWantVersus) this.onWantVersus(); });
@@ -1159,6 +1169,58 @@ export class Game {
           b2.appendChild(no);
         });
       });
+    });
+  }
+
+  // 詰まったときの手がかり
+  _hintPanel() {
+    this.doPause((body) => {
+      const goal = S.currentGoal(this.state);
+
+      const t = document.createElement("h3");
+      t.textContent = "いま、どうすれば";
+      body.appendChild(t);
+
+      const now = document.createElement("p");
+      now.className = "goalnow";
+      now.textContent = "▸ " + goal.now;
+      body.appendChild(now);
+
+      const box = document.createElement("div");
+      box.className = "hintbox";
+      goal.lines.forEach((l) => {
+        const p = document.createElement("p");
+        p.textContent = l;
+        if (!l) p.className = "gap";
+        box.appendChild(p);
+      });
+      body.appendChild(box);
+
+      const t2 = document.createElement("h3");
+      t2.textContent = "「それ」から逃げるには";
+      body.appendChild(t2);
+
+      const list = document.createElement("div");
+      list.className = "survlist";
+      S.SURVIVAL.forEach(([head, detail]) => {
+        const d = document.createElement("div");
+        d.className = "survrow";
+        const h = document.createElement("b");
+        h.textContent = head;
+        const p = document.createElement("span");
+        p.textContent = detail;
+        d.appendChild(h); d.appendChild(p);
+        list.appendChild(d);
+      });
+      body.appendChild(list);
+
+      const hr = document.createElement("hr");
+      body.appendChild(hr);
+      const back = document.createElement("button");
+      back.className = "big";
+      back.textContent = "戻る";
+      back.onclick = () => { this.snd.ui(); this.ui.closePause(); this.doPause(); };
+      body.appendChild(back);
     });
   }
 

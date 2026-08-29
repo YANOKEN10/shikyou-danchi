@@ -127,6 +127,18 @@
     100% { opacity: 0; }
   }
 
+  /* いま、すること（画面のすみに小さく） */
+  #objective {
+    position: fixed; right: 14px; bottom: 16px; z-index: 7; pointer-events: none;
+    max-width: 46vw; text-align: right;
+    font-family: var(--mincho); font-size: 13px; letter-spacing: .06em; line-height: 1.6;
+    color: rgba(184,163,122,.72); text-shadow: 0 2px 8px #000;
+    opacity: 0; transition: opacity .5s ease;
+  }
+  #objective.show { opacity: 1; }
+  #objective::before { content: "いま、すること　"; color: rgba(220,214,200,.38); font-size: 11px; }
+  body.touch #objective { bottom: 190px; right: 12px; font-size: 12px; }
+
   /* 電池・体力 */
   #hud {
     position: fixed; left: 16px; bottom: 16px; z-index: 7; pointer-events: none;
@@ -248,6 +260,24 @@
     background: #171a20; border: 1px solid var(--line); border-radius: 3px; padding: 3px 7px; text-align: center;
   }
 
+  /* 手がかり */
+  .goalnow {
+    margin: 12px 0 4px; font-family: var(--mincho); font-size: 15.5px;
+    color: var(--accent); letter-spacing: .06em;
+  }
+  .hintbox {
+    background: #12151a; border: 1px solid var(--line); border-left: 2px solid var(--accent);
+    border-radius: 3px; padding: 12px 14px; margin: 8px 0 4px;
+  }
+  .hintbox p { margin: 0; font-size: 13.5px; line-height: 1.85; color: #ddd6c4; }
+  .hintbox p.gap { height: .7em; }
+  .survlist { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+  .survrow {
+    background: #101318; border: 1px solid var(--line); border-radius: 3px; padding: 9px 12px;
+  }
+  .survrow b { display: block; font-size: 13px; color: #ddd6c4; margin-bottom: 3px; font-weight: 500; }
+  .survrow span { font-size: 12px; color: var(--dim); line-height: 1.7; }
+
   /* 音のたしかめ */
   .sfxlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 14px; }
   .sfxlist button.sfx {
@@ -358,6 +388,7 @@
 
 <div id="floorTag"></div>
 <div id="versus"></div>
+<div id="objective"></div>
 <div id="prompt"></div>
 <div id="sub"></div>
 <div id="whoami"></div>

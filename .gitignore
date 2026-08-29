@@ -8,3 +8,5 @@ shots/
 
 .vercel
 .env*
+shots
+.tmpfaces

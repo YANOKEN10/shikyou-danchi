@@ -671,7 +671,7 @@ export function face() {
 
   const cx = S / 2, cy = H * 0.47;
   const FW = 76;
-  const EY = cy - 24, EX = 35;
+  const EY = cy - 20, EX = 31;
 
   const smudge = (x, y, w, h, a, col, op) => {
     const q = g.createRadialGradient(x, y, 1, x, y, Math.max(w, h));
@@ -706,50 +706,33 @@ export function face() {
   smudge(cx + 62, cy - 40, 20, 28, 0, "6,6,10", 0.55);
   smudge(cx, cy + 100, 34, 18, 0, "6,6,10", 0.5);
 
-  /* --- 目。大きく見開いている。白目が広く、瞳孔は小さい --- */
+  /* --- 目。遠目には「二つの闇」、近づくと見開いた白目 --- */
   const eye = (ex, ey, w, h, look, drop) => {
-    // 落ちくぼみ。目のまわりだけを、きつく暗く
-    smudge(ex, ey + 2, w * 1.9, h * 2.1, 0, "0,0,0", 0.94);
-    smudge(ex, ey + h * 1.5, w * 1.5, h * 0.9, 0, "0,0,0", 0.55);   // 隈
+    smudge(ex, ey + 3, w * 2.6, h * 3.0, 0, "0,0,0", 0.9);       // 落ちくぼみ
+    smudge(ex, ey + h * 2.0, w * 1.7, h * 1.3, 0, "0,0,0", 0.5);  // 隈
 
     g.save();
     g.beginPath(); g.ellipse(ex, ey, w, h, 0, 0, 7); g.clip();
-    // 白目
-    g.fillStyle = "rgba(208,206,200,0.98)";
+    g.fillStyle = "rgba(196,194,188,0.97)";
     g.fillRect(ex - w, ey - h, w * 2, h * 2);
-    // 白目の下ふちに、わずかな影
-    const sh = g.createLinearGradient(0, ey - h, 0, ey + h);
-    sh.addColorStop(0, "rgba(60,60,66,0.45)");
-    sh.addColorStop(0.35, "rgba(60,60,66,0)");
-    sh.addColorStop(1, "rgba(40,40,46,0.4)");
-    g.fillStyle = sh; g.fillRect(ex - w, ey - h, w * 2, h * 2);
-    // 虹彩。小さいほど「見開いている」ように見える
-    g.fillStyle = "rgba(22,22,26,0.98)";
-    g.beginPath(); g.arc(ex + look, ey + h * 0.10, w * 0.36, 0, 7); g.fill();
+    g.fillStyle = "rgba(28,28,32,0.97)";
+    g.beginPath(); g.arc(ex + look, ey + 1.5, w * 0.44, 0, 7); g.fill();
     g.fillStyle = "rgba(0,0,0,1)";
-    g.beginPath(); g.arc(ex + look, ey + h * 0.10, w * 0.15, 0, 7); g.fill();
-    // 上まぶたは、ほんの少しだけ
-    g.fillStyle = "rgba(4,4,8,0.85)";
-    g.beginPath(); g.ellipse(ex, ey - h * (1.02 + drop), w * 1.3, h * 0.62, 0, 0, 7); g.fill();
+    g.beginPath(); g.arc(ex + look, ey + 1.5, w * 0.20, 0, 7); g.fill();
+    g.fillStyle = "rgba(4,4,8,0.9)";
+    g.beginPath(); g.ellipse(ex, ey - h * (0.55 + drop), w * 1.35, h, 0, 0, 7); g.fill();
     g.restore();
 
-    // まぶた。丸い線で囲まず、上下の影で目の形を作る
-    g.strokeStyle = "rgba(2,2,5,0.92)"; g.lineWidth = 3.4; g.lineCap = "round";
+    g.strokeStyle = "rgba(3,3,6,0.85)"; g.lineWidth = 2;
     g.beginPath();
-    g.moveTo(ex - w * 1.04, ey - h * 0.24);
-    g.quadraticCurveTo(ex, ey - h * 1.34, ex + w * 1.04, ey - h * 0.30);
+    g.moveTo(ex - w * 1.05, ey - h * 0.1);
+    g.quadraticCurveTo(ex, ey - h * 1.25, ex + w * 1.05, ey - h * 0.16);
     g.stroke();
-    g.strokeStyle = "rgba(2,2,5,0.6)"; g.lineWidth = 1.8;
-    g.beginPath();
-    g.moveTo(ex - w * 0.94, ey + h * 0.42);
-    g.quadraticCurveTo(ex, ey + h * 1.18, ex + w * 0.94, ey + h * 0.36);
-    g.stroke();
-    // 濡れた光
-    g.fillStyle = "rgba(244,244,240,0.62)";
-    g.beginPath(); g.arc(ex + look - w * 0.3, ey - h * 0.34, 2.6, 0, 7); g.fill();
+    g.fillStyle = "rgba(240,240,236,0.6)";
+    g.beginPath(); g.arc(ex + look - w * 0.22, ey - h * 0.32, 1.9, 0, 7); g.fill();
   };
-  eye(cx - EX, EY, 21, 14.5, 2.4, 0.04);
-  eye(cx + EX + 2, EY - 4, 19.5, 15.5, -2.0, 0.0);
+  eye(cx - EX, EY, 13.5, 9.5, 1.8, 0.06);
+  eye(cx + EX + 1, EY - 3, 12.5, 10.5, -1.4, 0.0);
 
   // 眉
   g.strokeStyle = "rgba(6,6,10,0.75)"; g.lineWidth = 3.6; g.lineCap = "round";
@@ -765,85 +748,17 @@ export function face() {
   g.beginPath(); g.ellipse(cx - 7.5, cy + 36, 5, 3.6, 0.25, 0, 7); g.fill();
   g.beginPath(); g.ellipse(cx + 7.5, cy + 36, 5, 3.6, -0.25, 0, 7); g.fill();
 
-  /* --- 口。あごが外れたように、大きく裂けて開いている --- */
-  const MT = cy + 42, MB = cy + 108;      // 口の上端と下端
-  const MW = 30;                          // 口の半幅
-  smudge(cx, (MT + MB) / 2, MW + 22, (MB - MT) / 2 + 18, 0, "0,0,0", 0.72);
-
-  // 口の中。ふちがゆがむよう、左右で高さを変える
-  g.fillStyle = "rgba(0,0,0,1)";
+  /* --- 口。大きく、暗く、ゆがんで --- */
+  smudge(cx, cy + 70, 34, 26, 0, "0,0,0", 0.55);
+  g.fillStyle = "rgba(0,0,0,0.97)";
   g.beginPath();
-  g.moveTo(cx - MW, MT + 6);
-  g.quadraticCurveTo(cx - 10, MT - 8, cx + 4, MT - 4);
-  g.quadraticCurveTo(cx + 22, MT + 2, cx + MW, MT + 12);
-  g.quadraticCurveTo(cx + MW - 4, MB - 26, cx + 6, MB);
-  g.quadraticCurveTo(cx - MW + 8, MB - 22, cx - MW, MT + 6);
+  g.moveTo(cx - 21, cy + 56);
+  g.quadraticCurveTo(cx - 2, cy + 48, cx + 20, cy + 58);
+  g.quadraticCurveTo(cx + 17, cy + 88, cx - 3, cy + 94);
+  g.quadraticCurveTo(cx - 19, cy + 86, cx - 21, cy + 56);
   g.closePath(); g.fill();
-
-  // 歯。上下に、そろっていない歯を並べる
-  g.save();
-  g.beginPath();
-  g.moveTo(cx - MW, MT + 6);
-  g.quadraticCurveTo(cx - 10, MT - 8, cx + 4, MT - 4);
-  g.quadraticCurveTo(cx + 22, MT + 2, cx + MW, MT + 12);
-  g.quadraticCurveTo(cx + MW - 4, MB - 26, cx + 6, MB);
-  g.quadraticCurveTo(cx - MW + 8, MB - 22, cx - MW, MT + 6);
-  g.closePath(); g.clip();
-  for (let i = -3; i <= 3; i++) {
-    const tx = cx + i * 8.4 + (Math.random() - 0.5) * 2.6;
-    const tw = 5.6 + Math.random() * 2.6;
-    const th = 7 + Math.random() * 7;
-    const tv = 168 + (Math.random() * 34 | 0);
-    g.fillStyle = "rgba(" + tv + "," + (tv - 6) + "," + (tv - 22) + ",0.78)";
-    g.save(); g.translate(tx, MT + 8); g.rotate((Math.random() - 0.5) * 0.3);
-    g.beginPath(); g.moveTo(-tw / 2, -6); g.lineTo(tw / 2, -6);
-    g.lineTo(tw / 2 - 1, th); g.lineTo(-tw / 2 + 1, th); g.closePath(); g.fill();
-    g.restore();
-  }
-  for (let i = -2; i <= 2; i++) {
-    const tx = cx + i * 9.2 + (Math.random() - 0.5) * 3.4;
-    const tw = 5 + Math.random() * 2.4;
-    const th = 5 + Math.random() * 6;
-    const bv = 140 + (Math.random() * 32 | 0);
-    g.fillStyle = "rgba(" + bv + "," + (bv - 6) + "," + (bv - 20) + ",0.66)";
-    g.save(); g.translate(tx, MB - 10); g.rotate((Math.random() - 0.5) * 0.34);
-    g.beginPath(); g.moveTo(-tw / 2, 6); g.lineTo(tw / 2, 6);
-    g.lineTo(tw / 2 - 1, -th); g.lineTo(-tw / 2 + 1, -th); g.closePath(); g.fill();
-    g.restore();
-  }
-  // 奥の闇
-  const deep = g.createRadialGradient(cx, (MT + MB) / 2 + 6, 2, cx, (MT + MB) / 2 + 6, MW);
-  deep.addColorStop(0, "rgba(0,0,0,1)");
-  deep.addColorStop(0.6, "rgba(0,0,0,0.85)");
-  deep.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = deep;
-  g.beginPath(); g.ellipse(cx, (MT + MB) / 2 + 6, MW * 0.8, (MB - MT) * 0.3, 0, 0, 7); g.fill();
-  g.restore();
-
-  // 口の輪郭
-  g.strokeStyle = "rgba(2,2,5,0.9)"; g.lineWidth = 2.2;
-  g.beginPath();
-  g.moveTo(cx - MW, MT + 6);
-  g.quadraticCurveTo(cx - 10, MT - 8, cx + 4, MT - 4);
-  g.quadraticCurveTo(cx + 22, MT + 2, cx + MW, MT + 12);
-  g.stroke();
-
-  // 口の端から、頬へ裂けた線
-  const rip = (x0, y0, dir, len) => {
-    g.strokeStyle = "rgba(2,2,5,0.86)";
-    g.lineWidth = 3.2;
-    g.beginPath(); g.moveTo(x0, y0);
-    let x = x0, y = y0, a = dir;
-    for (let i = 0; i < 5; i++) {
-      a += (Math.random() - 0.5) * 0.5;
-      x += Math.cos(a) * (len / 5); y += Math.sin(a) * (len / 5);
-      g.lineTo(x, y);
-      g.lineWidth = Math.max(0.6, 3.2 - i * 0.6);
-    }
-    g.stroke();
-  };
-  rip(cx - MW, MT + 8, Math.PI * 1.03, 34);
-  rip(cx + MW, MT + 14, Math.PI * -0.03, 32);
+  g.fillStyle = "rgba(168,164,158,0.4)";
+  g.beginPath(); g.ellipse(cx - 1, cy + 100, 15, 5, 0, 0, 7); g.fill();
 
   /* --- ひび割れ --- */
   const crack = (x0, y0, dir, len, w, depth) => {

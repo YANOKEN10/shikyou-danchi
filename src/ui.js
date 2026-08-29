@@ -19,6 +19,7 @@ export class UI {
       pause: $("pause"), pauseBody: $("pauseBody"),
       ending: $("ending"), endingBody: $("endingBody"),
       toast: $("toast"), fade: $("fade"), floorTag: $("floorTag"), versus: $("versus"),
+      objective: $("objective"),
       grain: $("grain"),
     };
     this.subQueue = [];
@@ -87,6 +88,14 @@ export class UI {
   setStamina(v) {
     this.el.stam.style.width = Math.max(0, Math.min(1, v)) * 100 + "%";
     this.el.stam.parentElement.style.opacity = v > 0.98 ? 0 : 1;
+  }
+
+  // いま、すること
+  setObjective(text) {
+    const el = this.el.objective;
+    if (!el) return;
+    if (el.textContent !== (text || "")) el.textContent = text || "";
+    el.classList.toggle("show", Boolean(text));
   }
 
   // 鬼ごっこの表示（残り時間・鍵・人数）
