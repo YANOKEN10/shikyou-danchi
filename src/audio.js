@@ -129,6 +129,7 @@ export class Sound {
       ["引き出し・押し入れ", () => this.drawer()],
       ["袋がこすれる", () => this.rustle()],
       ["床がきしむ", () => this.creakFloor()],
+      ["鍋が落ちる", () => this.clatter()],
       ["拾う", () => this.pickup()],
       ["懐中電灯", () => this.click()],
       ["分電盤のつまみ", () => this.switchFlip()],
@@ -369,6 +370,22 @@ export class Sound {
       this.burst({ freq: 1500, q: 6, vol: 0.30, dur: 0.04, wet: 0.7 });
       this.tone({ type: "triangle", f0: 128, f1: 58, vol: 0.11, dur: 0.09, wet: 0.6 });
     }, 55);
+  }
+
+  // 金物が落ちて、床で跳ねる（台所の鍋）
+  clatter() {
+    this.burst({ freq: 620, q: 2.2, vol: 0.5, dur: 0.09, wet: 1.3 });
+    this.tone({ type: "triangle", f0: 240, f1: 150, vol: 0.16, dur: 0.5, wet: 1.4 });
+    this.tone({ type: "sine", f0: 96, f1: 58, vol: 0.22, dur: 0.35, wet: 1.2 });
+    // 跳ねて、だんだん間隔が詰まる
+    let d = 150;
+    for (let i = 0; i < 6; i++) {
+      setTimeout(() => {
+        this.burst({ freq: rnd(520, 900), q: 3, vol: 0.26 / (i * 0.6 + 1), dur: 0.05, wet: 1.2 });
+        this.tone({ type: "triangle", f0: rnd(200, 300), f1: 140, vol: 0.06 / (i * 0.5 + 1), dur: 0.18, wet: 1.1 });
+      }, d);
+      d += 150 * Math.pow(0.68, i);
+    }
   }
 
   // 床のきしみ。部屋の中を歩くと、たまに鳴る

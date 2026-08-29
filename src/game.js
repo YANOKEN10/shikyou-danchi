@@ -9,6 +9,7 @@ import * as TX from "./textures.js";
 import { Player } from "./player.js";
 import { Stalkers, Apparition } from "./entity.js";
 import { UI } from "./ui.js";
+import { Haunts } from "./haunt.js";
 import * as S from "./story.js";
 
 const SAVE_V = 1;
@@ -69,6 +70,7 @@ export class Game {
 
     this.state = this._fresh();
     this.floor = null;
+    this.haunt = new Haunts(this);
     this.clock = new THREE.Clock();
 
     addEventListener("resize", () => this._resize());
@@ -290,8 +292,20 @@ export class Game {
     this.apparT = 8 + Math.random() * 12;
     this.whisperT = 14 + Math.random() * 18;
     this.gustT = 12 + Math.random() * 20;
+    this.haunt.reset();
     this.popT = 10 + Math.random() * 18;
     this.dripT = 0;
+
+    // はじめから開いている扉（逃げこむ先）を、ここで開けておく
+    this.floor.doors.forEach((d) => {
+      if (!d.startOpen || !d.canEnter) return;
+      if (d.build) d.build();
+      d.open = true;
+      this.floor.col.remove(d.col);
+      d.pivot.rotation.y = -1.95;
+      const it = this.floor.inter.find((i) => i.kind === "door" && i.door === d);
+      if (it) it.label = "閉める";
+    });
 
     this.snd.buzzOff();
     if (!def.lightsOut) this.snd.buzzOn(def.flicker ? 0.045 : 0.022);
@@ -386,6 +400,7 @@ export class Game {
     }
 
     this._roomFx(dt);
+    this.haunt.update(dt);
 
     // 懐中電灯
     const on = p.lightOn && p.hasLight && p.battery > 0;
@@ -506,6 +521,9 @@ export class Game {
     // 廊下を誰かが通る音（部屋にいるあいだ）
     this.passT = 9 + Math.random() * 14;
 
+    // 出たときに靴が増えている用の仕込み
+    if (this.state.floor >= 2) this.haunt.armShoes();
+
     // まれに、扉がひとりでに閉まる
     if (!d.slammed && this.state.floor >= 2 && Math.random() < 0.22) {
       d.slammed = true;
@@ -515,6 +533,7 @@ export class Game {
   }
 
   _roomExit() {
+    this.haunt.dropShoes(this.curRoom);
     this.snd.roomToneOff();
     this.snd.waterOff();
     this.snd.crtOff();

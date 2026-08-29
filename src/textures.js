@@ -507,6 +507,95 @@ export function hair() {
   return t;
 }
 
+// 壁に滲む血。塗ったのではなく、内側から染み出したように
+export function bloodStain() {
+  const key = "blood";
+  if (cache.has(key)) return cache.get(key);
+  const W = 256, H = 256;
+  const c = cv(W, H);
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, W, H);
+
+  // ぐにゃりとした輪郭を描く（真円にしない）
+  const lump = (cx, cy, r, wob, fill) => {
+    g.beginPath();
+    const n = 13;
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const rr = r * (1 - wob / 2 + Math.random() * wob);
+      const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr * 0.86;
+      i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+    }
+    g.closePath();
+    g.fillStyle = fill;
+    g.fill();
+  };
+
+  // 外側のうすい染み。ぼかしてから重ねる
+  g.save();
+  g.filter = "blur(9px)";
+  for (let i = 0; i < 5; i++) {
+    lump(W / 2 + (Math.random() - 0.5) * 66, H * 0.36 + (Math.random() - 0.5) * 48,
+      34 + Math.random() * 30, 0.9, "rgba(58,10,12,0.30)");
+  }
+  g.restore();
+
+  // 中ほど。濃さはむらのまま
+  g.save();
+  g.filter = "blur(4px)";
+  for (let i = 0; i < 7; i++) {
+    lump(W / 2 + (Math.random() - 0.5) * 58, H * 0.34 + (Math.random() - 0.5) * 40,
+      16 + Math.random() * 24, 1.1, "rgba(74,8,10,0.36)");
+  }
+  g.restore();
+
+  // ごく狭い、濃いところ
+  g.save();
+  g.filter = "blur(2px)";
+  for (let i = 0; i < 6; i++) {
+    lump(W / 2 + (Math.random() - 0.5) * 44, H * 0.32 + (Math.random() - 0.5) * 30,
+      5 + Math.random() * 12, 1.2, "rgba(92,10,12,0.44)");
+  }
+  g.restore();
+
+  // 垂れる筋。細く長く、先だけ丸く溜まる
+  for (let i = 0; i < 16; i++) {
+    const x = W / 2 + (Math.random() - 0.5) * 104;
+    const y0 = H * 0.30 + Math.random() * 44;
+    const len = 24 + Math.random() * 150;
+    const wd = 1 + Math.random() * 3.4;
+    const q = g.createLinearGradient(0, y0, 0, y0 + len);
+    q.addColorStop(0, "rgba(76,8,10,0.52)");
+    q.addColorStop(0.6, "rgba(60,6,8,0.34)");
+    q.addColorStop(1, "rgba(44,4,6,0)");
+    g.fillStyle = q;
+    // まっすぐ落ちず、すこし蛇行する
+    let x2 = x;
+    for (let s = 0; s < len; s += 3) {
+      x2 += (Math.random() - 0.5) * 0.5;
+      g.fillRect(x2, y0 + s, wd, 3.4);
+    }
+    if (Math.random() < 0.55) {
+      g.fillStyle = "rgba(70,7,9,0.4)";
+      g.beginPath(); g.ellipse(x2 + wd / 2, y0 + len, wd * 0.9, wd * 1.7, 0, 0, 7); g.fill();
+    }
+  }
+
+  // 壁のざらつきに負ける（一様な面にしない）
+  const img = g.getImageData(0, 0, W, H);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const n = 0.72 + Math.random() * 0.42;
+    d[i + 3] = Math.min(255, d[i + 3] * n);
+  }
+  g.putImageData(img, 0, 0);
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t);
+  return t;
+}
 // 名札（頭の上に浮かぶ）
 export function nameTag(name) {
   const key = "tag:" + name;

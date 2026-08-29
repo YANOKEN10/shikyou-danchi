@@ -962,6 +962,10 @@ export function buildFloor(scene, floorDef, opt) {
       kind: "door", door: rec, label: canEnter ? "開ける" : "調べる",
     });
 
+    // 「それ」が出る階では、いくつかの扉をはじめから開けておく。
+    // 逃げこむ先がないと、突き当りで詰んでしまうため。
+    rec.startOpen = Boolean(floorDef.entity) && (i === 1 || i === 3);
+
     if (canEnter) {
       // 中身は、扉を開けたときにはじめて組み立てます（開けない部屋のぶんは作りません）
       const useUnit = forced ? { no: 404, enter: true, memo: "m5" } : u;

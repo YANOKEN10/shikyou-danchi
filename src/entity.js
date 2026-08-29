@@ -160,7 +160,7 @@ export class Stalker {
     }
 
     // 少しだけ横に揺れる
-    this.z = LANE_Z + Math.sin(performance.now() * 0.0006 + this.x) * 0.18;
+    this.z = LANE_Z + Math.sin(performance.now() * 0.0006 + this.x) * 0.07;
 
     this.mesh.position.set(this.x, 0, this.z);
     const face = (goal - this.x) >= 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -168,7 +168,8 @@ export class Stalker {
     animateEntity(this.mesh, dt, this.moving);
 
     /* --- つかまえる --- */
-    if (!safe && dist < 0.85 && this.state === "hunt") {
+    // 廊下の幅は 2.55m。ここを広くすると、壁ぎわを抜けられなくなる
+    if (!safe && dist < 0.6 && this.state === "hunt") {
       if (out) out.caught = true;
     }
 
