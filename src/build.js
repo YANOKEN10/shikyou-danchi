@@ -46,6 +46,19 @@ function put(g, mesh, x, y, z) {
 
 function lam(opt) { return new THREE.MeshLambertMaterial(opt); }
 
+// 生成画像は一度だけ読み込み、階を移るたびに同じ大きな画像を再取得しないようにする。
+const generatedLoader = new THREE.TextureLoader();
+function generatedTexture(path, rx = 1, ry = 1) {
+  const tex = generatedLoader.load(path);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(rx, ry);
+  return tex;
+}
+const generatedWall = generatedTexture("./assets/generated/wall-aged.webp", 2, 1);
+const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 2, 2);
+const generatedEntity = generatedTexture("./assets/generated/entity-photoreal.webp");
+
 /* ---------- 当たり判定 ---------- */
 
 export class Colliders {
@@ -994,8 +1007,9 @@ export function buildFloor(scene, floorDef, opt) {
     ceil: lam({ map: TX.ceilingPaint(Math.round(LEN / 4), 1) }),
     steel: lam({ map: TX.paintedSteel(), color: 0x9aa0a0 }),
     darksteel: lam({ color: 0x34383a }),
-    paper: lam({ map: TX.wallpaper(2, 1) }),
-    tatami: lam({ map: TX.tatami(2, 2) }),
+    // 写実素材は室内だけに使い、廊下の既存の読みやすさと軽さは保つ。
+    paper: lam({ map: generatedWall, color: 0xc1b6a3 }),
+    tatami: lam({ map: generatedTatami, color: 0xb3ad91 }),
     tile: lam({ map: TX.tileWall(2, 2) }),
     wood: lam({ color: 0x6a5138 }),
     fusuma: lam({ color: 0xb8ad90 }),
@@ -1386,13 +1400,28 @@ export function buildEntity() {
   });
   const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.50, 0.98), bangMat);
   bang.position.set(0, -0.295, 0.176);
+  // 写実素材の濡れ髪を使うため、四角い輪郭が出る旧前髪は影としても表示しない。
+  bang.visible = false;
   headPivot.add(bang);
+
+  // 立体の輪郭と当たり判定は残し、正面だけ生成画像を重ねて肌・濡れ髪・衣服の細部を見せる。
+  // 顔が髪で隠れない全身素材なので、遠距離は人影、近距離は異様な表情として読める。
+  const photoMat = new THREE.MeshBasicMaterial({
+    map: generatedEntity, transparent: true, alphaTest: 0.045,
+    // 黒背景は加算合成では光を足さないため消え、肌と衣服の細部だけを立体へ重ねられる。
+    depthWrite: false, side: THREE.DoubleSide, color: 0x737b80,
+    opacity: 0.88, blending: THREE.AdditiveBlending,
+  });
+  const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.28, H), photoMat);
+  // 胴体より手前へ出し、立体が写真面を突き抜けて胸元に穴のような形を作らないようにする。
+  photo.position.set(0, H / 2, 0.39);
+  g.add(photo);
 
   // この一体だけ、別の層で照らす（懐中電灯で白飛びさせないため）
   g.traverse((o) => o.layers.set(1));
 
   g.userData = {
-    body, hem, shadow, arms, headPivot, face: faceMat, veil,
+    body, hem, shadow, arms, headPivot, face: faceMat, veil, photo,
     phase: Math.random() * 6, twitch: 2 + Math.random() * 4, tilt: 0, H,
     hemT: Math.random() * 10,
   };
@@ -1453,6 +1482,9 @@ export function animateEntity(ent, dt, moving) {
   const s = Math.sin(u.phase);
   ent.position.y = Math.abs(Math.sin(u.phase * 1.7)) * (moving ? 0.022 : 0.006);
   u.body.rotation.z = s * (moving ? 0.022 : 0.006);
+  // 写実素材にも呼吸のような微動だけを与え、板絵に見える静止感を弱める。
+  u.photo.rotation.z = s * (moving ? 0.012 : 0.003);
+  u.photo.scale.x = 1 + Math.sin(u.phase * 0.53) * 0.006;
 
   // 裾。歩いているときほど後ろへ流れ、房ごとにばらばらに揺れる
   u.hemT += dt * (moving ? 2.4 : 0.9);
