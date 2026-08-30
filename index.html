@@ -362,27 +362,109 @@
 
   /* ---------------- ログイン画面 ---------------- */
 
-  #gate { z-index: 20; background: #04050a; }
-  #gate .panel { max-width: 460px; }
-  #gTitle {
-    font-family: var(--mincho); font-size: clamp(34px, 9vw, 52px); font-weight: 700;
-    letter-spacing: .3em; margin: 4px 0 2px; text-indent: .3em;
-    color: #e0dacb; text-shadow: 0 0 40px rgba(180,160,120,.18);
+  #gate {
+    z-index: 20;
+    /* 団地の外壁と消えかけた廊下灯を重ね、ゲームを始める前から舞台が伝わる色にする。 */
+    background:
+      radial-gradient(circle at 73% 30%, rgba(184,170,126,.14) 0 5%, transparent 22%),
+      linear-gradient(90deg, rgba(2,5,7,.98) 0 48%, rgba(4,10,12,.83) 70%, rgba(1,3,5,.97) 100%),
+      url("assets/generated/wall-aged.webp") center / 680px repeat;
   }
-  #gSub { color: var(--dim); font-size: 12.5px; letter-spacing: .18em; margin: 0 0 6px; }
-  #gLead { color: #9a948a; font-size: 12.5px; line-height: 1.9; margin: 14px 0 18px; }
+  #gate::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    /* 柱と手すりだけを抽象化し、写真一枚の背景より団地らしい奥行きを出す。 */
+    background:
+      linear-gradient(90deg, transparent 0 62%, rgba(2,5,7,.78) 62% 63%, transparent 63% 83%, rgba(2,5,7,.72) 83% 84%, transparent 84%),
+      linear-gradient(0deg, rgba(1,3,5,.9) 0 11%, transparent 11% 37%, rgba(2,5,7,.64) 37% 39%, transparent 39% 72%, rgba(2,5,7,.7) 72% 74%, transparent 74%);
+    opacity: .76;
+  }
+  #gate::after {
+    content: ""; position: fixed; z-index: 0; pointer-events: none;
+    right: max(5vw, calc((100vw - 900px) / 2)); bottom: 0;
+    width: min(36vw, 390px); height: min(88vh, 720px);
+    background: url("assets/generated/entity-photoreal.webp") center bottom / contain no-repeat;
+    mix-blend-mode: screen; opacity: .34; filter: grayscale(1) contrast(1.3) brightness(.72);
+    animation: gateBreath 7s ease-in-out infinite;
+  }
+  @keyframes gateBreath {
+    0%, 100% { opacity: .28; transform: translateY(4px) scale(1); }
+    50% { opacity: .38; transform: translateY(0) scale(1.008); }
+  }
+  #gate .panel {
+    position: relative; z-index: 1; width: min(900px, 100%); max-width: 900px;
+    padding: 38px 410px 30px 42px; overflow: hidden;
+    background: linear-gradient(105deg, rgba(7,10,12,.97) 0 52%, rgba(7,10,12,.68) 72%, rgba(7,10,12,.28) 100%);
+    border: 1px solid rgba(166,151,119,.28); border-left: 3px solid #77534a;
+    box-shadow: 0 28px 90px #000, inset 0 0 80px rgba(0,0,0,.42);
+  }
+  #gate .panel::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 52%; width: 1px;
+    background: linear-gradient(transparent, rgba(184,163,122,.32), transparent);
+  }
+  #gTitle {
+    font-family: var(--mincho); font-size: clamp(42px, 6vw, 68px); font-weight: 700;
+    letter-spacing: .24em; margin: 0 0 3px; text-indent: .24em;
+    color: #ddd5c3;
+    text-shadow: 2px 0 0 rgba(103,25,24,.7), -1px 1px 0 #07090b, 0 0 34px rgba(184,163,122,.18);
+  }
+  #gSub {
+    color: #9c7f67; font-family: var(--mincho); font-size: 13px;
+    letter-spacing: .28em; margin: 0 0 7px; text-align: center;
+  }
+  #gLead {
+    color: #aaa397; font-family: var(--mincho); font-size: 12.5px;
+    line-height: 1.95; margin: 18px 0 20px; padding: 12px 0;
+    border-top: 1px solid rgba(184,163,122,.12); border-bottom: 1px solid rgba(184,163,122,.12);
+  }
 
   .tabs { display: flex; gap: 5px; margin: 16px 0 4px; }
   .tab {
-    flex: 1; text-align: center; padding: 10px 4px; font-size: 12.5px; cursor: pointer;
-    background: #0a0c10; border: 1px solid var(--line); color: var(--dim); border-radius: 3px;
+    flex: 1; text-align: center; padding: 11px 4px; font-size: 12.5px; cursor: pointer;
+    background: rgba(6,9,11,.88); border: 1px solid #292b2b; color: #817d75; border-radius: 1px;
   }
-  .tab.on { background: #1d1a14; border-color: var(--accent); color: var(--accent); }
+  .tab.on {
+    background: linear-gradient(#292218, #171510); border-color: #8f7650; color: #dccca7;
+    box-shadow: inset 0 -2px 0 #7b3b32;
+  }
+  /* type属性を省略した名前欄も含め、入力の開始位置と幅を統一する。 */
+  #gate input {
+    width: 100%; padding: 11px 12px; font-size: 16px; font-family: var(--gothic);
+    background: rgba(2,5,7,.88); border-color: #303231; border-radius: 1px;
+  }
+  #gate input:focus { border-color: #a68c61; box-shadow: 0 0 0 2px rgba(166,140,97,.12); }
+  #gate button { border-radius: 1px; letter-spacing: .06em; }
+  #gate button.big {
+    background: linear-gradient(180deg, #b8a477, #8d784f); color: #110f0b;
+    border-color: #c6b184; box-shadow: 0 5px 20px rgba(0,0,0,.45);
+  }
+  #gate button.big:hover { background: linear-gradient(180deg, #cab889, #a28b5c); }
+  #gate button.ghost { color: #aaa49a; border-color: #303231; background: rgba(5,8,10,.48); }
+  #gate button.ghost:hover { color: #ddd4c3; border-color: #65594a; background: rgba(20,20,17,.82); }
   #fields > div { margin-top: 14px; }
   #fields label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
   .hint { font-size: 11px; color: #605c55; margin: 5px 0 0; line-height: 1.65; }
 
   #cont { display: none; margin-top: 4px; }
+
+  @media (max-width: 720px) {
+    #gate { align-items: start; padding: 10px; }
+    #gate::after {
+      right: -16vw; width: 74vw; height: 74vh; opacity: .16;
+      filter: grayscale(1) contrast(1.35) brightness(.5);
+    }
+    #gate .panel {
+      width: 100%; padding: 25px 20px 22px; max-height: calc(100vh - 20px);
+      background: rgba(6,9,11,.92); border-left-width: 2px;
+    }
+    #gate .panel::after { display: none; }
+    #gTitle { font-size: clamp(39px, 13vw, 56px); }
+    #gLead { margin: 13px 0 14px; padding: 9px 0; line-height: 1.75; }
+    .tabs { margin-top: 13px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #gate::after { animation: none; }
+  }
 
   /* どちらの記録を使うか。ログイン画面より前に出す */
   #pick { z-index: 24; }
