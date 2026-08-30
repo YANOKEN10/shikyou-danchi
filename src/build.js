@@ -333,7 +333,8 @@ function commonWetArea(C) {
     C.blk(right - 0.04, za, right + 0.04, gap0);
     C.blk(right - 0.04, gap1, right + 0.04, zb);
     const dc = C.col.add(right - 0.05, gap0, right + 0.05, gap1, "fixtureDoor");
-    hingedDoor(C, { x: right, z: gap0, w: doorW, h: 1.92, mat: mats.frostglass, shut: Math.PI / 2, opened: 0,
+    // 戸口は正のZ方向へ続くため、閉状態では戸板も正のZへ伸ばして隙間を塞ぐ。
+    hingedDoor(C, { x: right, z: gap0, w: doorW, h: 1.92, mat: mats.frostglass, shut: -Math.PI / 2, opened: 0,
       collider: dc, ix: right + 0.38, iz: (gap0 + gap1) / 2, label: name + "を開ける" });
   };
   makeFront(split, front, "トイレ");
@@ -383,6 +384,9 @@ function commonWetArea(C) {
   C.blk(x1 - 1.62, z0 - 1.31, x1 - 0.1, z0 - 0.75);
   const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.035, 16), mats.darksteel);
   sink.scale.z = 1.35; sink.position.set(x1 - 0.88, 0.84, z0 - 1.03); C.g.add(sink);
+  // 吊り戸棚は部屋別に置くとトイレへ重なるため、共通の流しの真上だけに固定する。
+  const upper = C.pb(1.35, 0.55, 0.3, mats.wood, x1 - 0.86, 1.73, z0 - 0.86);
+  upper.userData.kind = "kitchenUpper";
   buildFridge(C, x1 - 0.48, z0 - 2.25);
 }
 
@@ -400,16 +404,31 @@ function addWetMirror(C, px, py, pz, ry, w, h, label) {
 
 function buildFridge(C, px, pz) {
   const { mats } = C;
-  C.pb(0.66, 1.48, 0.62, mats.appliance, px, 0.74, pz);
-  C.blk(px - 0.36, pz - 0.34, px + 0.36, pz + 0.34);
+  const w = 0.68, h = 1.48, d = 0.62, t = 0.055;
+  const front = pz + d / 2;
+  // 中身まで詰まった直方体では扉を開けても正面が塞がるため、外板を組んで空洞を作る。
+  C.pb(w, t, d, mats.appliance, px, t / 2, pz);
+  C.pb(w, t, d, mats.appliance, px, h - t / 2, pz);
+  C.pb(t, h, d, mats.appliance, px - w / 2 + t / 2, h / 2, pz);
+  C.pb(t, h, d, mats.appliance, px + w / 2 - t / 2, h / 2, pz);
+  C.pb(w - t * 2, h - t * 2, t, mats.fridgeInside, px, h / 2, pz - d / 2 + t / 2);
+  C.blk(px - w / 2 - 0.02, pz - d / 2 - 0.02, px + w / 2 + 0.02, pz + d / 2 + 0.02);
+
+  const inside = new THREE.Group();
+  // 棚を扉と別にしておくと、開いた瞬間に冷蔵庫の奥行きと向きが読み取れる。
+  for (const y of [0.43, 0.82, 1.17]) {
+    const shelf = box(w - 0.14, 0.025, d - 0.13, mats.fridgeInside);
+    shelf.position.set(px, y, pz + 0.015); inside.add(shelf);
+  }
+  inside.visible = false; C.g.add(inside);
+
   const pivot = new THREE.Group();
-  pivot.position.set(px - 0.33, 0, pz + 0.325);
-  const door = box(0.66, 1.04, 0.055, mats.fridgeDoor);
-  door.position.set(0.33, 0.94, 0); pivot.add(door);
+  pivot.position.set(px - w / 2, 0, front + 0.018);
+  const door = box(w, h - 0.06, 0.055, mats.fridgeDoor);
+  door.position.set(w / 2, h / 2, 0); pivot.add(door);
   const handle = box(0.035, 0.55, 0.04, mats.darksteel);
-  handle.position.set(0.58, 0.94, 0.045); pivot.add(handle); C.g.add(pivot);
-  const inside = C.pb(0.54, 0.88, 0.03, mats.fridgeInside, px, 0.94, pz + 0.305);
-  inside.visible = false;
+  handle.position.set(w - 0.09, 0.86, 0.045); pivot.add(handle); C.g.add(pivot);
+  pivot.userData.kind = "fridgeDoor";
   C.inter.push({ x: px, y: 1.0, z: pz + 0.7, r: 1.2, kind: "detail", label: "冷蔵庫を開ける",
     say: "電気は止まっているのに、中が冷えている。", scare: "fridge", repeat: true,
     fixture: { pivot, inside, open: false, opened: -Math.PI * 0.58 } });
@@ -463,7 +482,6 @@ const FURNISH = {
   // 台所と茶の間（ふつうの住まい）
   kitchen(C) {
     const { mats, dx, x0, x1, z0, z1, zMid, H } = C;
-    C.pb(1.7, 0.6, 0.35, mats.wood, x0 + 1.0, 1.72, z0 - 0.75);
     // 靴箱
     C.pb(0.9, 0.75, 0.35, mats.wood, x1 - 0.6, 0.38, z0 - 2.5);
     C.blk(x1 - 1.1, z0 - 2.7, x1 - 0.1, z0 - 2.3);
@@ -516,7 +534,6 @@ const FURNISH = {
       }
       C.blk(px - 0.32, pz - 0.32, px + 0.32, pz + 0.32);
     });
-    C.pb(1.7, 0.6, 0.35, mats.wood, x0 + 1.0, 1.72, C.z0 - 0.75);
     C.detailAt = [x0 + 0.7, z1 + 1.25];
   },
 
@@ -642,7 +659,6 @@ const FURNISH = {
     // 小さなテレビと灰皿
     C.pb(0.5, 0.42, 0.42, mats.appliance, x1 - 0.5, 0.21, z1 + 0.4);
     C.pb(0.2, 0.05, 0.2, mats.porcelain, dx + 0.7, 0.03, z1 + 1.4);
-    C.pb(1.7, 0.6, 0.35, mats.wood, x0 + 1.0, 1.72, C.z0 - 0.75);
     C.detailAt = [dx + 0.35, z1 + 1.3];
   },
 
@@ -709,7 +725,6 @@ const FURNISH = {
     // 貼り紙
     C.wall(0.42, 0.52, mats.notice, x1 - 0.05, 1.6, z1 + 1.2, -Math.PI / 2);
     C.itemAt = [x0 + 1.1, z1 + 0.95];
-    C.pb(1.7, 0.6, 0.35, mats.wood, x0 + 1.0, 1.72, C.z0 - 0.75);
     lowTable(C, dx, zMid - 1.4);
     C.detailAt = [x0 + 1.1, z1 + 0.95];
   },
@@ -728,7 +743,6 @@ const FURNISH = {
     // 座布団と卓
     C.pb(0.6, 0.09, 0.6, mats.cushion, dx, 0.05, z1 + 2.0);
     lowTable(C, dx + 1.1, z1 + 2.0);
-    C.pb(1.7, 0.6, 0.35, mats.wood, x0 + 1.0, 1.72, C.z0 - 0.75);
     C.detailAt = [dx, z1 + 1.5];
   },
 
