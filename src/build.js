@@ -1420,7 +1420,15 @@ export function buildEntity() {
   bang.visible = false;
   headPivot.add(bang);
 
-  // 立体の輪郭と当たり判定は残し、正面だけ生成画像を重ねて肌・濡れ髪・衣服の細部を見せる。
+  // 生成画像へ切り替えたあとも旧立体モデルが背後で描画され、透明部分や横から
+  // 古い胴体・頭髪がはみ出していた。影と当たり判定は別なので、旧外観だけを止める。
+  body.visible = false;
+  hem.visible = false;
+  neck.visible = false;
+  headPivot.visible = false;
+  arms.forEach((arm) => { arm.visible = false; });
+
+  // 当たり判定はキャラクター位置から計算されるため、外観は生成画像だけで見せる。
   // 顔が髪で隠れない全身素材なので、遠距離は人影、近距離は異様な表情として読める。
   const photoMat = new THREE.MeshBasicMaterial({
     map: generatedEntity, transparent: true, alphaTest: 0.045,
