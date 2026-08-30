@@ -57,7 +57,19 @@ function generatedTexture(path, rx = 1, ry = 1) {
 }
 const generatedWall = generatedTexture("./assets/generated/wall-aged.webp", 2, 1);
 const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 2, 2);
-const generatedEntity = generatedTexture("./assets/generated/entity-photoreal.webp");
+// URLを更新して旧版がブラウザキャッシュに残っていても、現在の「それ」を必ず再取得させる。
+const generatedEntity = generatedTexture("./assets/generated/entity-photoreal.webp?v=20260830-2");
+const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-v2.png?v=20260830");
+
+// 一枚の生成画像を六つの素材へ切り分け、通信量を増やさず家具ごとの質感を変える。
+function interiorTexture(col, row) {
+  const tex = interiorAtlas.clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1 / 3, 1 / 2);
+  // Three.js の画像原点は下なので、row=0 を画像の上段として反転する。
+  tex.offset.set(col / 3, row === 0 ? 1 / 2 : 0);
+  return tex;
+}
 
 /* ---------- 当たり判定 ---------- */
 
@@ -393,7 +405,7 @@ function commonWetArea(C) {
   }
 
   // 右壁を共通の台所にし、部屋の種類にかかわらず流しと冷蔵庫を持たせる。
-  C.pb(1.45, 0.82, 0.48, mats.steel, x1 - 0.86, 0.41, z0 - 1.03);
+  C.pb(1.45, 0.82, 0.48, mats.kitchenSteel, x1 - 0.86, 0.41, z0 - 1.03);
   C.blk(x1 - 1.62, z0 - 1.31, x1 - 0.1, z0 - 0.75);
   const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.035, 16), mats.darksteel);
   sink.scale.z = 1.35; sink.position.set(x1 - 0.88, 0.84, z0 - 1.03); C.g.add(sink);
@@ -1011,7 +1023,7 @@ export function buildFloor(scene, floorDef, opt) {
     paper: lam({ map: generatedWall, color: 0xc1b6a3 }),
     tatami: lam({ map: generatedTatami, color: 0xb3ad91 }),
     tile: lam({ map: TX.tileWall(2, 2) }),
-    wood: lam({ color: 0x6a5138 }),
+    wood: lam({ map: interiorTexture(2, 0), color: 0xb8a590 }),
     fusuma: lam({ color: 0xb8ad90 }),
     notebook: lam({ color: 0x2e3d5c }),
     night: lam({ color: 0x0a1020 }),
@@ -1020,13 +1032,13 @@ export function buildFloor(scene, floorDef, opt) {
     /* --- 部屋ごとの家財 --- */
     wood_floor: lam({ map: TX.flooring(3, 3) }),
     bare_floor: lam({ map: TX.floorStair(2, 2), color: 0x8a8a86 }),
-    darkwood: lam({ color: 0x2c2119 }),
+    darkwood: lam({ map: interiorTexture(2, 0), color: 0x776655 }),
     gold: lam({ color: 0x6b5a2a }),
     portrait: lam({ map: TX.portrait() }),
     cushion: lam({ color: 0x5a3f42 }),
-    cardboard: lam({ map: TX.cardboard() }),
-    appliance: lam({ color: 0x9aa0a2 }),
-    fridgeDoor: lam({ color: 0xb8b9b5 }),
+    cardboard: lam({ map: interiorTexture(1, 1), color: 0xb39a78 }),
+    appliance: lam({ map: interiorTexture(1, 0), color: 0xb3aea0 }),
+    fridgeDoor: lam({ map: interiorTexture(1, 0), color: 0xc4ba9e }),
     fridgeInside: new THREE.MeshBasicMaterial({ color: 0xb8d4d0 }),
     satchel: lam({ color: 0x7a2028 }),
     scar: lam({ color: 0x2a2018 }),
@@ -1034,8 +1046,9 @@ export function buildFloor(scene, floorDef, opt) {
     stain: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false }),
     stainDark: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }),
     bag: lam({ color: 0x22242a }),
-    porcelain: lam({ color: 0xc9c6bc }),
-    mirror: lam({ map: TX.mirrorGlass() }),
+    porcelain: lam({ map: interiorTexture(0, 0), color: 0xd0cbc0 }),
+    kitchenSteel: lam({ map: interiorTexture(0, 1), color: 0xb2b0aa }),
+    mirror: lam({ map: interiorTexture(2, 1), color: 0xa5aaa7 }),
     mirrorSmear: new THREE.MeshBasicMaterial({ map: TX.mirrorSmear(), transparent: true, depthWrite: false }),
     shade: lam({ color: 0xcdc6b2 }),
     cord: lam({ color: 0xb8b2a2 }),
@@ -1379,6 +1392,9 @@ export function buildEntity() {
   });
   const face = new THREE.Mesh(new THREE.PlaneGeometry(0.285, 0.375), faceMat);
   face.position.set(0, -0.045, 0.171);
+  // 新しい全身素材の顔と二重に表示されていた旧Canvas顔は描画しない。
+  // マテリアル自体は互換性のため残し、既存の演出コードが参照しても壊れないようにする。
+  face.visible = false;
   headPivot.add(face);
 
   // 髪。頭から胸の下まで、房になって垂れる

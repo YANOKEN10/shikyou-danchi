@@ -519,7 +519,13 @@ export class Game {
   _roomEnter(d) {
     this.snd.roomToneOn();
     const room = d.room || {};
-    if (room.scare === "water") { this.snd.waterOn(); this.dripT = 3 + Math.random() * 4; }
+    if (room.scare === "water") {
+      this.snd.waterOn(); this.dripT = 3 + Math.random() * 4;
+      // 毎回声がすると仕掛けを待たれるため、水回りでも低確率に限って排水口から鳴らす。
+      if (this.state.floor >= 2 && Math.random() < 0.22) {
+        setTimeout(() => this.snd.sample("drain-voice", { vol: 0.27, pan: Math.random() < 0.5 ? -0.45 : 0.45, wet: 0.58 }), 1300);
+      }
+    }
     if (room.kind === "tv") this.snd.crtOn();
 
     // 廊下を誰かが通る音（部屋にいるあいだ）
@@ -554,7 +560,11 @@ export class Game {
       this._swingTo(f.pivot, f.open ? f.opened : 0);
       f.inside.visible = f.open;
       it.label = f.open ? "冷蔵庫を閉める" : "冷蔵庫を開ける";
-      if (f.open) this.snd.doorOpen(); else this.snd.doorShut();
+      if (f.open) {
+        this.snd.doorOpen();
+        // 空の冷蔵庫から毎回鳴らすと警報になるので、ときどき内側から三度だけ返事をさせる。
+        if (Math.random() < 0.38) setTimeout(() => this.snd.sample("fridge-knocks", { vol: 0.38, wet: 0.42 }), 520);
+      } else this.snd.doorShut();
       return;
     }
     // まず、触ったものの音
@@ -846,6 +856,10 @@ export class Game {
       if (this.state.memos.indexOf(it.id) < 0) this.state.memos.push(it.id);
       if (it.id === "m5") this.state.flags.loopBroken = true;
       this.ui.showMemo(it.id);
+      // 読んでいる最中にだけ鉛筆音を重ね、文章を書いた存在がまだ近くにいる印象を残す。
+      if (this.state.floor >= 2 && Math.random() < 0.34) {
+        setTimeout(() => this.snd.sample("pencil-writing", { vol: 0.24, pan: Math.random() < 0.5 ? -0.65 : 0.65, wet: 0.35 }), 650);
+      }
       if (it.kind === "goal") {
         this.state.flags.hasNotebook = true;
         this._pendingChase = true;

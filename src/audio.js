@@ -1,11 +1,26 @@
 // ============================================================
-//  音（すべて WebAudio で合成。音声ファイルは1つも使いません）
+//  音（生成した音声素材と WebAudio の合成音を組み合わせます）
 //   ・ブラウザの決まりで、最初の操作より前には音を鳴らせません。
 //     unlock() を「はじめる」ボタンなどから呼んでください。
 // ============================================================
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const rnd = (a, b) => a + Math.random() * (b - a);
+
+// 人の気配だけは波形の細部が怖さを左右するため、生成済みの音声素材を使う。
+// 読み込みに失敗しても既存の合成音へ戻れるよう、URL はここで一元管理する。
+const SAMPLE_FILES = {
+  "wet-breath": "wet-breath.wav",
+  "barefoot-follow": "barefoot-follow.wav",
+  "wet-cloth-drag": "wet-cloth-drag.wav",
+  "joint-cracks": "joint-cracks.wav",
+  "mirror-scratch": "mirror-scratch.wav",
+  "drain-voice": "drain-voice.wav",
+  "fridge-knocks": "fridge-knocks.wav",
+  "pencil-writing": "pencil-writing.wav",
+  "door-handle": "door-handle.wav",
+  "distant-laugh": "distant-laugh.wav",
+};
 
 export class Sound {
   constructor() {
@@ -18,6 +33,8 @@ export class Sound {
     this._buzz = null;
     this._heart = null;
     this._breath = null;
+    this.samples = new Map();
+    this._sampleLoading = false;
   }
 
   unlock() {
@@ -44,9 +61,53 @@ export class Sound {
 
     this.noiseBuf = this._noise(2.0);
     this.ready = true;
+    this._loadSamples();
 
     this._keepAwake();
     this._watchGestures();
+  }
+
+  // ゲーム開始を待たせないため非同期で読み込み、取れた素材から順に使用可能にする。
+  async _loadSamples() {
+    if (this._sampleLoading || !this.ctx) return;
+    this._sampleLoading = true;
+    await Promise.all(Object.entries(SAMPLE_FILES).map(async ([name, file]) => {
+      try {
+        const url = new URL(`../assets/audio/${file}`, import.meta.url);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`音声を取得できません: ${res.status}`);
+        const buffer = await this.ctx.decodeAudioData(await res.arrayBuffer());
+        this.samples.set(name, buffer);
+      } catch (e) {
+        // 通信や古いブラウザで失敗しても、各場面の WebAudio 合成音を鳴らして進行を守る。
+      }
+    }));
+  }
+
+  // 生成音声を左右と残響へ送る。未読込なら false を返し、呼び出し側が合成音へ戻れるようにする。
+  sample(name, opt) {
+    if (!this.ready || this.muted) return false;
+    const buffer = this.samples.get(name);
+    if (!buffer) return false;
+    const o = opt || {}, ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = o.rate == null ? 1 : o.rate;
+    const gain = ctx.createGain();
+    gain.gain.value = o.vol == null ? 0.3 : o.vol;
+    src.connect(gain);
+    let tail = gain;
+    if (ctx.createStereoPanner) {
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = clamp(o.pan || 0, -1, 1);
+      gain.connect(pan); tail = pan;
+    }
+    tail.connect(this.dry);
+    const wet = ctx.createGain();
+    wet.gain.value = o.wet == null ? 0.28 : o.wet;
+    tail.connect(wet); wet.connect(this.verb);
+    src.start();
+    return true;
   }
 
   // iPhone のマナーモードでは WebAudio が消されることがある。
@@ -142,6 +203,13 @@ export class Sound {
       ["鏡が鳴る", () => this.mirrorRing()],
       ["ささやき", () => this.whisper()],
       ["見つかったとき", () => this.stinger()],
+      ["濡れた呼吸", () => this.sample("wet-breath", { vol: 0.46 })],
+      ["裸足でついてくる", () => this.sample("barefoot-follow", { vol: 0.4 })],
+      ["濡れた服を引きずる", () => this.sample("wet-cloth-drag", { vol: 0.38 })],
+      ["関節が鳴る", () => this.sample("joint-cracks", { vol: 0.38 })],
+      ["排水口の声", () => this.sample("drain-voice", { vol: 0.34 })],
+      ["冷蔵庫の内側", () => this.sample("fridge-knocks", { vol: 0.4 })],
+      ["遠くの笑い声", () => this.sample("distant-laugh", { vol: 0.34 })],
     ];
   }
 
@@ -310,6 +378,7 @@ export class Sound {
   }
 
   locked() {
+    this.sample("door-handle", { vol: 0.32, pan: rnd(-0.3, 0.3) });
     // 開かない扉。ノブがガチャつく
     for (let i = 0; i < 3; i++) {
       setTimeout(() => {
@@ -422,6 +491,7 @@ export class Sound {
   // 鏡が、澄んだ音で鳴る
   // 鏡が鳴る。わずかにずれた音を重ねて、耳ざわりな「うなり」を作る
   mirrorRing() {
+    this.sample("mirror-scratch", { vol: 0.26, pan: rnd(-0.25, 0.25), wet: 0.45 });
     [[213, 0.085], [219.7, 0.075], [436, 0.032]].forEach(([f, v], i) => {
       this.tone({
         type: "sine", f0: f, f1: f * 0.968,
@@ -624,6 +694,7 @@ export class Sound {
   // 廊下を、誰かが通っていく足音
   passBy() {
     if (!this.ready || this.muted) return;
+    this.sample("barefoot-follow", { vol: 0.27, pan: Math.random() < 0.5 ? -0.7 : 0.7, wet: 0.42 });
     const n = 5 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) {
       setTimeout(() => {
@@ -738,6 +809,8 @@ export class Sound {
   // 見えている姿と反対側から呼吸を鳴らすため、短い音だけ左右へ振り分ける。
   spatialBreath(pan) {
     if (!this.ready || this.muted) return;
+    // 実際の濡れた呼吸が使えるときは、それだけにして音量の重なりを避ける。
+    if (this.sample("wet-breath", { vol: 0.48, pan: pan || 0, wet: 0.32 })) return;
     const ctx = this.ctx, t = this.t;
     const src = this._src(false);
     src.playbackRate.value = 0.55;

@@ -118,6 +118,7 @@ export class DreadDirector {
     const x = g.curRoom.dx + (Math.random() < 0.5 ? -1.65 : 1.65);
     g.appar.show(x, b.z1 + 0.75, 6.5);
     g.snd.spatialBreath(Math.sign(x - g.player.pos.x));
+    g.snd.sample("wet-cloth-drag", { vol: 0.24, pan: Math.sign(x - g.player.pos.x), wet: 0.35 });
     this._setLive({ life: 6.5, step: () => {}, end: () => g.appar.hide() });
   }
 
@@ -125,6 +126,8 @@ export class DreadDirector {
   _peek() {
     const g = this.g, d = pick(this._closedDoors());
     d.busy = true;
+    // 見える前にノブだけ鳴らし、プレイヤー自身が開けた扉との聞き分けを崩す。
+    g.snd.sample("door-handle", { vol: 0.3, pan: Math.sign(d.dx - g.player.pos.x) });
     if (d.build) d.build();
     g.appar.show(d.dx, -0.62, 7);
     this._setLive({ life: 7, step: (e) => {
@@ -139,6 +142,8 @@ export class DreadDirector {
     const s = this._firstStalker();
     s.dreadPose = "crawl"; s.dreadT = 9;
     this.g.snd.spatialBreath(Math.random() < 0.5 ? -1 : 1);
+    this.g.snd.sample("wet-cloth-drag", { vol: 0.34, pan: rnd(-0.5, 0.5), wet: 0.4 });
+    setTimeout(() => this.g.snd.sample("joint-cracks", { vol: 0.32, pan: rnd(-0.7, 0.7) }), 850);
     this._setLive({ life: 9, step: () => {}, end: () => { s.dreadPose = ""; s.mesh.scale.set(1, 1, 1); } });
   }
 
@@ -147,6 +152,7 @@ export class DreadDirector {
     const g = this.g, s = this._firstStalker();
     const far = s.x < g.floor.len / 2 ? g.floor.len - 1.1 : 1.1;
     g.appar.show(far, null, 7.5);
+    g.snd.sample("distant-laugh", { vol: 0.26, pan: Math.sign(far - g.player.pos.x), wet: 0.55 });
     this._setLive({ life: 7.5, step: () => {}, end: () => g.appar.hide() });
   }
 
@@ -154,6 +160,7 @@ export class DreadDirector {
   _mimic() {
     const s = this._firstStalker();
     s.mimicT = 8;
+    this.g.snd.sample("barefoot-follow", { vol: 0.3, pan: rnd(-0.6, 0.6), wet: 0.42 });
     this._setLive({ life: 8, step: () => {}, end: () => { s.mimicT = 0; s.awareness = Math.max(s.awareness, 0.82); s.rage = 2.5; } });
   }
 
@@ -162,6 +169,7 @@ export class DreadDirector {
     const g = this.g, s = this._firstStalker();
     s.lightTrick = Math.random() < 0.5 ? "freeze" : "betray";
     s.lightSeen = g.player.lightOn;
+    g.snd.sample("joint-cracks", { vol: 0.25, pan: Math.sign(s.x - g.player.pos.x) });
     this._setLive({ life: 10, step: () => {}, end: () => { s.lightTrick = ""; s.lightSeen = false; } });
   }
 
@@ -180,6 +188,7 @@ export class DreadDirector {
   nearMiss() {
     const g = this.g;
     g.snd.stinger(); g.ui.hit();
+    setTimeout(() => g.snd.sample("distant-laugh", { vol: 0.25, pan: rnd(-0.9, 0.9), wet: 0.65 }), 900);
     const f = g.floor.fx.find((x) => x.kind === "mirror");
     if (f) { f.ph = 0.0001; f.t = 20; }
     g.ui.sayNow("——顔が触れる寸前、それは消えた。");
