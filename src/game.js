@@ -10,6 +10,7 @@ import { Player } from "./player.js";
 import { Stalkers, Apparition } from "./entity.js";
 import { UI } from "./ui.js";
 import { Haunts } from "./haunt.js";
+import { DreadDirector } from "./dread.js";
 import * as S from "./story.js";
 
 const SAVE_V = 1;
@@ -71,6 +72,7 @@ export class Game {
     this.state = this._fresh();
     this.floor = null;
     this.haunt = new Haunts(this);
+    this.dread = new DreadDirector(this);
     this.clock = new THREE.Clock();
 
     addEventListener("resize", () => this._resize());
@@ -293,6 +295,7 @@ export class Game {
     this.whisperT = 14 + Math.random() * 18;
     this.gustT = 12 + Math.random() * 20;
     this.haunt.reset();
+    this.dread.reset();
     this.popT = 10 + Math.random() * 18;
     this.dripT = 0;
 
@@ -443,6 +446,7 @@ export class Game {
     let out = { tension: 0, veryNear: 0, caught: false, spotted: false };
     if (this.stalkers.active) out = this.stalkers.update(dt, p, f.col, this.snd);
     this.appar.update(dt, p);
+    this.dread.update(dt, out);
 
     if (out.spotted && !this._spotFlag) {
       this._spotFlag = true;

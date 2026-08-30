@@ -35,6 +35,9 @@ export class Stalker {
 
   get pos() { return { x: this.x, z: this.z }; }
 
+  // 演出側にも視界判定を共有し、同じ角度計算が二重にずれないようにする。
+  inView(player) { return this._inView(player); }
+
   dispose(scene) {
     scene.remove(this.mesh);
     this.mesh.traverse((o) => {
@@ -66,7 +69,12 @@ export class Stalker {
       }
       return;
     }
-    if (this.state === "gone") return;
+    if (this.state === "gone") {
+      this.goneT = (this.goneT || 0) - dt;
+      if (this.goneT <= 0) {
+        this.state = "listen"; this.mesh.visible = true; this.awareness = 0.38;
+      } else return;
+    }
 
     /* --- 気づき --- */
     let gain = 0;
@@ -149,6 +157,21 @@ export class Stalker {
       }
     }
 
+    if (this.mimicT > 0) {
+      this.mimicT -= dt;
+      // 足音が止まった瞬間にこちらも止まり、動作を真似していると気づかせる。
+      if (!player.moving) speed = 0;
+      else speed *= 0.68;
+    }
+    if (this.lightTrick === "freeze" && player.lightOn) speed = 0;
+    if (this.lightTrick === "betray") {
+      if (player.lightOn) this.lightSeen = true;
+      else if (this.lightSeen && dist > 2.4) {
+        this.x += Math.sign(player.pos.x - this.x) * Math.min(1.8, dist - 1.8);
+        this.lightSeen = false; this.rage = Math.max(this.rage, 2.2);
+      }
+    }
+
     if (speed > 0) {
       const d = goal - this.x;
       const step = Math.sign(d) * Math.min(Math.abs(d), speed * dt);
@@ -160,7 +183,19 @@ export class Stalker {
     }
 
     // 少しだけ横に揺れる
-    this.z = LANE_Z + Math.sin(performance.now() * 0.0006 + this.x) * 0.07;
+    if (this.dreadPose === "crawl") {
+      this.dreadT = Math.max(0, (this.dreadT || 0) - dt);
+      this.z = LANE_Z + Math.sin(performance.now() * 0.0048 + this.x) * 0.62;
+      // 全身を低く横倒しにし、単なる背の低い立ち姿ではなく床を這う輪郭へ変える。
+      this.mesh.scale.y += (0.62 - this.mesh.scale.y) * Math.min(1, dt * 8);
+      this.mesh.scale.x += (0.92 - this.mesh.scale.x) * Math.min(1, dt * 8);
+      this.mesh.rotation.z += (1.22 - this.mesh.rotation.z) * Math.min(1, dt * 7);
+    } else {
+      this.z = LANE_Z + Math.sin(performance.now() * 0.0006 + this.x) * 0.07;
+      this.mesh.scale.y += (1 - this.mesh.scale.y) * Math.min(1, dt * 8);
+      this.mesh.scale.x += (1 - this.mesh.scale.x) * Math.min(1, dt * 8);
+      this.mesh.rotation.z += (0 - this.mesh.rotation.z) * Math.min(1, dt * 7);
+    }
 
     this.mesh.position.set(this.x, 0, this.z);
     const face = (goal - this.x) >= 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -170,7 +205,13 @@ export class Stalker {
     /* --- つかまえる --- */
     // 廊下の幅は 2.55m。ここを広くすると、壁ぎわを抜けられなくなる
     if (!safe && dist < 0.6 && this.state === "hunt") {
-      if (out) out.caught = true;
+      // 最初の一度だけは捕獲寸前で消える可能性を持たせ、接近＝即終了という予測を崩す。
+      if (!this.nearMissUsed && Math.random() < 0.42) {
+        this.nearMissUsed = true; this.state = "gone"; this.goneT = 4.5;
+        this.mesh.visible = false;
+        this.x = player.pos.x < this.len / 2 ? this.len - 1.5 : 1.5;
+        if (out) out.nearMiss = true;
+      } else if (out) out.caught = true;
     }
 
     // 近さ（緊張の度合いに使う）
@@ -209,7 +250,7 @@ export class Stalkers {
   get active() { return this.list.length > 0; }
 
   update(dt, player, col, snd) {
-    const out = { tension: 0, veryNear: 0, caught: false, spotted: false, stare: false };
+    const out = { tension: 0, veryNear: 0, caught: false, spotted: false, stare: false, nearMiss: false };
     this.list.forEach((s) => s.update(dt, player, col, snd, out));
     return out;
   }

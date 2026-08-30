@@ -735,6 +735,26 @@ export class Sound {
     this._breath = null;
   }
 
+  // 見えている姿と反対側から呼吸を鳴らすため、短い音だけ左右へ振り分ける。
+  spatialBreath(pan) {
+    if (!this.ready || this.muted) return;
+    const ctx = this.ctx, t = this.t;
+    const src = this._src(false);
+    src.playbackRate.value = 0.55;
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass"; f.frequency.value = 620; f.Q.value = 0.8;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.72);
+    src.connect(f); f.connect(gain);
+    if (ctx.createStereoPanner) {
+      const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan || 0));
+      gain.connect(p); p.connect(this.master);
+    } else gain.connect(this.master);
+    src.start(t); src.stop(t + 0.75);
+  }
+
   allOff() {
     this.ambienceOff();
     this.buzzOff();
