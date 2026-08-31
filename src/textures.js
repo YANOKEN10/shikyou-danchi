@@ -13,6 +13,44 @@ function cv(w, h) {
   return c;
 }
 
+// 浴室の床へ貼り付く濡れ髪。立体チューブでは虫の脚に見えるため、
+// 太さの違う曲線を半透明で重ね、束と一本毛が混ざる平たいデカールにする。
+export function wetHairDecal() {
+  const key = "wetHairDecal";
+  if (cache.has(key)) return cache.get(key);
+  const S = 512, c = cv(S), g = c.getContext("2d");
+  g.clearRect(0, 0, S, S);
+  g.lineCap = "round"; g.lineJoin = "round";
+  const strands = [
+    [255,252,180,190,105,235,58,175,12], [250,255,325,185,405,220,475,150,10],
+    [252,250,190,315,115,345,70,420,14], [258,252,325,315,398,350,455,430,11],
+    [250,250,205,205,225,135,175,72,9], [260,250,300,205,290,125,350,55,8],
+    [245,260,205,270,160,250,120,285,16], [265,260,310,270,350,255,400,290,15],
+  ];
+  // 束は黒一色にせず、青灰の細い反射を重ねると濡れた毛として読める。
+  strands.forEach(([x0,y0,c1x,c1y,c2x,c2y,x1,y1,w], i) => {
+    g.strokeStyle = `rgba(3,5,7,${0.78 + (i % 3) * 0.06})`; g.lineWidth = w;
+    g.beginPath(); g.moveTo(x0,y0); g.bezierCurveTo(c1x,c1y,c2x,c2y,x1,y1); g.stroke();
+    g.strokeStyle = "rgba(90,105,112,0.28)"; g.lineWidth = Math.max(1, w * 0.18);
+    g.beginPath(); g.moveTo(x0+2,y0-1); g.bezierCurveTo(c1x,c1y-2,c2x,c2y-1,x1,y1); g.stroke();
+  });
+  // 中央は排水口を塞ぎ切らず、何本かが縁へ絡んでいる輪にする。
+  g.strokeStyle = "rgba(2,3,5,0.9)"; g.lineWidth = 18;
+  g.beginPath(); g.ellipse(256,255,72,58,-0.25,0.25,Math.PI*1.85); g.stroke();
+  for (let i = 0; i < 30; i++) {
+    const a = (i / 30) * Math.PI * 2 + (i % 4) * 0.19;
+    const r = 48 + (i % 7) * 13, len = 45 + (i % 6) * 19;
+    const x0 = 256 + Math.cos(a) * r, y0 = 256 + Math.sin(a) * r;
+    g.strokeStyle = `rgba(5,7,9,${0.38 + (i % 5) * 0.09})`; g.lineWidth = 0.8 + (i % 4) * 0.55;
+    g.beginPath(); g.moveTo(x0,y0);
+    g.bezierCurveTo(x0+Math.cos(a+0.8)*len*0.45,y0+Math.sin(a+0.8)*len*0.45,
+      x0+Math.cos(a-0.45)*len*0.75,y0+Math.sin(a-0.45)*len*0.75,
+      x0+Math.cos(a)*len,y0+Math.sin(a)*len); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t); return t;
+}
+
 function tex(key, w, h, draw, rx, ry) {
   if (cache.has(key)) return cache.get(key);
   const c = cv(w, h);

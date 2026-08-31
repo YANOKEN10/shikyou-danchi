@@ -60,6 +60,7 @@ const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 
 // URLを更新して旧版がブラウザキャッシュに残っていても、現在の「それ」を必ず再取得させる。
 const generatedEntity = generatedTexture("./assets/generated/entity-photoreal.webp?v=20260830-2");
 const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-v2.png?v=20260830");
+const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v1.png?v=20260831");
 
 // 一枚の生成画像を六つの素材へ切り分け、通信量を増やさず家具ごとの質感を変える。
 function interiorTexture(col, row) {
@@ -68,6 +69,15 @@ function interiorTexture(col, row) {
   tex.repeat.set(1 / 3, 1 / 2);
   // Three.js の画像原点は下なので、row=0 を画像の上段として反転する。
   tex.offset.set(col / 3, row === 0 ? 1 / 2 : 0);
+  return tex;
+}
+
+// 水回り専用の四区画素材。共通画像から切り出して床・戸・照明の年代感を揃える。
+function wetAreaTexture(col, row) {
+  const tex = wetAreaAtlas.clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1 / 2, 1 / 2);
+  tex.offset.set(col / 2, row === 0 ? 1 / 2 : 0);
   return tex;
 }
 
@@ -295,12 +305,13 @@ function commonRoom(C) {
   skirt(D.UNIT_D, x0 + 0.02, (z0 + z1) / 2, Math.PI / 2);
   skirt(D.UNIT_D, x1 - 0.02, (z0 + z1) / 2, Math.PI / 2);
 
-  // 天井の照明器具（笠と引き紐）
+  // 天井の照明器具。生成素材の錆・虫・黄ばみを下面へ貼り、新品の白い笠に見せない。
   const shadeZ = (zMid + z1) / 2;
-  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.14, 14), mats.shade);
-  shade.position.set(dx, H - 0.10, shadeZ);
+  C.pb(0.96, 0.09, 0.3, mats.rustedSteel, dx, H - 0.055, shadeZ);
+  const shade = plane(0.88, 0.24, mats.roomLight);
+  shade.rotation.x = Math.PI / 2;
+  shade.position.set(dx, H - 0.105, shadeZ);
   C.g.add(shade);
-  C.pb(0.05, 0.14, 0.05, mats.steel, dx, H - 0.2, shadeZ);
   const cord = box(0.012, 0.62, 0.012, mats.cord);
   cord.position.set(dx + 0.16, H - 0.5, shadeZ);
   C.g.add(cord);
@@ -345,8 +356,10 @@ function commonWetArea(C) {
   const doorW = 0.68;
 
   // 水まわりを左へ寄せ、玄関から居室まで一直線に歩ける幅を中央に残す。
-  C.pb(right - left, 0.06, front - back, mats.tile, (left + right) / 2, 0.035, (front + back) / 2);
   const split = z0 - 1.52;
+  // 同じ新品タイルを敷き通すと間取りが読めないため、トイレと浴室で汚れ方と目地を変える。
+  C.pb(right - left, 0.06, front - split, mats.wetToiletFloor, (left + right) / 2, 0.035, (front + split) / 2);
+  C.pb(right - left, 0.06, split - back, mats.wetBathFloor, (left + right) / 2, 0.035, (split + back) / 2);
   C.pb(right - left, H, 0.08, mats.tile, (left + right) / 2, H / 2, split);
   C.blk(left, split - 0.04, right, split + 0.04);
 
@@ -359,7 +372,7 @@ function commonWetArea(C) {
     C.blk(right - 0.04, gap1, right + 0.04, zb);
     const dc = C.col.add(right - 0.05, gap0, right + 0.05, gap1, "fixtureDoor");
     // 戸口は正のZ方向へ続くため、閉状態では戸板も正のZへ伸ばして隙間を塞ぐ。
-    hingedDoor(C, { x: right, z: gap0, w: doorW, h: 1.92, mat: mats.frostglass, shut: -Math.PI / 2, opened: 0,
+    hingedDoor(C, { x: right, z: gap0, w: doorW, h: 1.92, mat: mats.wetDoor, shut: -Math.PI / 2, opened: 0,
       collider: dc, ix: right + 0.38, iz: (gap0 + gap1) / 2, label: name + "を開ける" });
   };
   makeFront(split, front, "トイレ");
@@ -391,18 +404,12 @@ function commonWetArea(C) {
   addWetMirror(C, left + 0.035, 1.35, z0 - 2.02, Math.PI / 2, 0.52, 0.68, "風呂の鏡を覗く");
   const drain = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.012, 16), mats.drain);
   drain.position.set(right - 0.28, 0.075, z0 - 1.87); C.g.add(drain);
-  // 排水口から伸びる髪は曲線にし、ただの黒い棒ではなく濡れて床へ貼り付いた形にする。
-  for (let i = 0; i < 11; i++) {
-    const a = (i / 11) * Math.PI * 1.8 - 0.7;
-    const len = 0.18 + Math.random() * 0.34;
-    const sx = right - 0.28, sz = z0 - 1.87;
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(sx, 0.084, sz),
-      new THREE.Vector3(sx + Math.cos(a + 0.45) * len * 0.45, 0.086, sz + Math.sin(a + 0.45) * len * 0.45),
-      new THREE.Vector3(sx + Math.cos(a) * len, 0.085, sz + Math.sin(a) * len),
-    ]);
-    C.g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 0.006, 4, false), mats.wetHair));
-  }
+  // 太い立体線は虫の脚に見えたため、濡れた束と細い毛を一枚の床デカールで表現する。
+  const hair = plane(0.92, 0.92, mats.wetHair);
+  hair.rotation.x = -Math.PI / 2;
+  hair.rotation.z = -0.28;
+  hair.position.set(right - 0.28, 0.088, z0 - 1.87);
+  C.g.add(hair);
 
   // 右壁を共通の台所にし、部屋の種類にかかわらず流しと冷蔵庫を持たせる。
   C.pb(1.45, 0.82, 0.48, mats.kitchenSteel, x1 - 0.86, 0.41, z0 - 1.03);
@@ -1058,9 +1065,13 @@ export function buildFloor(scene, floorDef, opt) {
     curtain: lam({ color: 0x6e6656 }),
     newspaper: lam({ color: 0xbdb49c }),
     frostglass: lam({ color: 0x8f9aa0 }),
+    wetBathFloor: lam({ map: wetAreaTexture(0, 0), color: 0xa8a49a }),
+    wetToiletFloor: lam({ map: wetAreaTexture(1, 0), color: 0xa59a80 }),
+    wetDoor: lam({ map: wetAreaTexture(0, 1), color: 0xb0b3ad, transparent: true, opacity: 0.88 }),
+    roomLight: new THREE.MeshBasicMaterial({ map: wetAreaTexture(1, 1), color: 0xc1b798 }),
     rustedSteel: lam({ color: 0x4d4b46 }),
     drain: lam({ color: 0x242729 }),
-    wetHair: new THREE.MeshBasicMaterial({ color: 0x07080a }),
+    wetHair: new THREE.MeshBasicMaterial({ map: TX.wetHairDecal(), transparent: true, depthWrite: false, side: THREE.DoubleSide }),
     damp: new THREE.MeshBasicMaterial({ map: TX.dampStain(), transparent: true, opacity: 0.74, depthWrite: false }),
     driedStem: lam({ color: 0x4a4230 }),
     eye: new THREE.MeshBasicMaterial({ color: 0xd8dcc8 }),
