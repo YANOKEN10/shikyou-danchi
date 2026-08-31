@@ -116,7 +116,7 @@ export const FLOORS = [
     laps: [
       { intro: "四階。ここで折り返せば、あと一つ上だ。", doors: null, entities: 1 },
       { intro: "……四階。いま、上ったはずだ。", doors: 404, entities: 1, say: "号室の札が、全部同じ数字になっている。" },
-      { intro: "四階。四階。四階。", doors: 404, entities: 2, short: true, open404: true, say: "一つだけ、扉が開いている。" },
+      { intro: "四階。四階。四階。", doors: 404, entities: 1, short: true, open404: true, say: "一つだけ、扉が開いている。" },
     ],
   },
 

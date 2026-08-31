@@ -292,6 +292,9 @@ export class Game {
     this.floorTime = 0;
     this.eventsDone = new Set();
     this.apparT = 8 + Math.random() * 12;
+    this.apparCooldown = 10 + Math.random() * 10;
+    this.lastLookYaw = this.player.yaw;
+    this.turnLook = 0;
     this.whisperT = 14 + Math.random() * 18;
     this.gustT = 12 + Math.random() * 20;
     this.haunt.reset();
@@ -494,6 +497,24 @@ export class Game {
   /* ---------------- 部屋の中 ---------------- */
 
   // 扉を開けたとき
+  // 演出用と追跡用が同時に見えると二体に見えるため、安全な時だけ本体と入れ替えて出す。
+  _showApparition(x, z, sec, opt) {
+    if (this.appar.mesh.visible) return false;
+    let unsafe = false;
+    this.stalkers.list.forEach((s) => {
+      const dist = Math.hypot(s.x - this.player.pos.x, s.z - this.player.pos.z);
+      if (s.state === "hunt" || s.awareness > 0.72 || dist < 4) unsafe = true;
+    });
+    if (unsafe) return false;
+    this.stalkers.list.forEach((s) => {
+      s.state = "gone";
+      s.goneT = Math.max(s.goneT || 0, (sec || 1.4) + 2.5);
+      s.mesh.visible = false;
+    });
+    this.appar.show(x, z, sec, opt);
+    return true;
+  }
+
   _roomOpened(d) {
     const room = d.room || {};
     const key = "note" + d.no + "_" + d.dx.toFixed(1);
@@ -503,14 +524,15 @@ export class Game {
       if (line) this.ui.say(line);
     }
 
-    // ときどき、部屋の奥に立っている
-    if (!d.peeked && Math.random() < 0.16 && this.state.floor >= 2) {
+    // 扉の向こうからゆっくり寄る姿を混ぜ、廊下の端だけを待つ遊びにしない。
+    const doorChance = this.state.floor === 4 ? 0.34 : 0.16;
+    if (!d.peeked && Math.random() < doorChance && this.state.floor >= 2) {
       d.peeked = true;
       const b = d.unitBounds;
       if (b) {
-        this.appar.show(d.dx + (Math.random() - 0.5) * 1.6, b.z1 + 0.9, 1.1 + Math.random() * 0.6);
-        this.snd.whisper();
-        this.ui.hit();
+        if (this._showApparition(d.dx + (Math.random() - 0.5) * 1.2, b.z1 + 1.0, 3.4, { mode: "approach", speed: 0.24 })) {
+          this.snd.whisper(); this.ui.hit();
+        }
       }
     }
   }
@@ -707,6 +729,7 @@ export class Game {
     (def.events || []).forEach((e, i) => {
       if (this.eventsDone.has(i)) return;
       if (this.floorTime < e.at) return;
+
       this.eventsDone.add(i);
       if (e.sound === "thud") this.snd.thud(true);
       if (e.sound === "doorShut") this.snd.doorShut();
@@ -714,15 +737,45 @@ export class Game {
       if (e.say) this.ui.say(e.say);
     });
 
-    // ふと、廊下の端に立っている
+    // 短時間に大きく振り向いた時だけ背後の出現を抽選し、何度も連発しない。
+    this.apparCooldown = Math.max(0, (this.apparCooldown || 0) - dt);
+    let turn = this.player.yaw - this.lastLookYaw;
+    while (turn > Math.PI) turn -= Math.PI * 2;
+    while (turn < -Math.PI) turn += Math.PI * 2;
+    this.lastLookYaw = this.player.yaw;
+    this.turnLook = Math.max(0, (this.turnLook || 0) - dt * 1.5) + Math.abs(turn);
+    if (this.turnLook > 2.25 && this.apparCooldown <= 0 && !this.player.inUnit && def.n >= 3) {
+      const f = this.player.forward();
+      const x = this.player.pos.x + f.x * 1.05;
+      const z = this.player.pos.z + f.z * 1.05;
+      if (this._showApparition(x, z, 3.2, { mode: "approach", speed: 0.16, scale: 1.08 })) {
+        this.snd.stinger(); this.ui.hit();
+        this.apparCooldown = 28 + Math.random() * 24;
+      }
+      this.turnLook = 0;
+    }
+
+    // 出現場所を端・途中・目前に分け、毎回同じ予告にならないようにする。
     if (this.stalkers.active || def.n >= 3) {
       this.apparT -= dt;
       if (this.apparT <= 0) {
-        this.apparT = 22 + Math.random() * 30;
-        const far = this.player.pos.x < this.floor.len / 2 ? this.floor.len - 1.2 : 1.2;
-        if (Math.abs(far - this.player.pos.x) > 8) {
-          this.appar.show(far, null, 1.1 + Math.random());
-          this.snd.whisper();
+        this.apparT = 28 + Math.random() * 32;
+        if (!this.player.inUnit) {
+          const p = this.player.pos, f = this.player.forward();
+          const roll = Math.random();
+          let shown = false;
+          if (roll < 0.24) {
+            shown = this._showApparition(p.x + f.x * 0.78, p.z + f.z * 0.78, 0.48, { scale: 1.22 });
+            if (shown) { this.snd.stinger(); this.ui.hit(); }
+          } else if (roll < 0.72) {
+            const x = Math.max(0.9, Math.min(this.floor.len - 0.9, p.x + f.x * 3.8));
+            shown = this._showApparition(x, p.z + f.z * 3.2, 4.8, { mode: "approach", speed: 0.38 });
+            if (shown) this.snd.whisper();
+          } else {
+            const far = p.x < this.floor.len / 2 ? this.floor.len - 1.2 : 1.2;
+            if (Math.abs(far - p.x) > 8) shown = this._showApparition(far, null, 1.0 + Math.random() * 0.7);
+            if (shown) this.snd.whisper();
+          }
         }
       }
     }

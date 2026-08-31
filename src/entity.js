@@ -279,24 +279,35 @@ export class Apparition {
     this.life = 0;
   }
 
-  show(x, z, sec) {
+  show(x, z, sec, opt) {
+    const o = opt || {};
     this.mesh.position.set(x, 0, z == null ? LANE_Z : z);
     this.mesh.rotation.y = -Math.PI / 2;
+    this.mesh.scale.setScalar(o.scale || 1);
     this.mesh.visible = true;
     this.life = sec || 1.4;
+    this.mode = o.mode || "still";
+    this.speed = o.speed || 0.28;
   }
 
   update(dt, player) {
     if (!this.mesh.visible) return;
     this.life -= dt;
     animateEntity(this.mesh, dt, false);
-    // こちらを向く
+    // 近づく演出でも捕獲判定は持たせず、本体との役割を混ぜない。
     const dx = player.pos.x - this.mesh.position.x;
-    this.mesh.rotation.y = dx >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    const dz = player.pos.z - this.mesh.position.z;
+    const dist = Math.hypot(dx, dz);
+    this.mesh.rotation.y = Math.atan2(dx, dz);
+    if (this.mode === "approach" && dist > 0.68) {
+      const step = Math.min(dist - 0.68, this.speed * dt);
+      this.mesh.position.x += dx / dist * step;
+      this.mesh.position.z += dz / dist * step;
+    }
     if (this.life <= 0) this.mesh.visible = false;
   }
 
-  hide() { this.mesh.visible = false; this.life = 0; }
+  hide() { this.mesh.visible = false; this.life = 0; this.mesh.scale.setScalar(1); }
 
   dispose() { this.scene.remove(this.mesh); }
 }
