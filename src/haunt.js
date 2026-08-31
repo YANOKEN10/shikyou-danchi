@@ -8,6 +8,23 @@ import * as THREE from "../lib/three.module.js";
 import * as TX from "./textures.js";
 import { D } from "./build.js";
 
+// 一枚の生成素材を四種類へ切り分け、怪異ごとに別画像を読み込む待ち時間をなくす。
+const apparitionAtlas = new THREE.TextureLoader().load("./assets/generated/ghost-phenomena-atlas-v1.png?v=20260831");
+apparitionAtlas.colorSpace = THREE.SRGBColorSpace;
+apparitionAtlas.wrapS = apparitionAtlas.wrapT = THREE.RepeatWrapping;
+function apparitionTexture(col, row) {
+  const tex = apparitionAtlas.clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(0.5, 0.5);
+  // Three.js は画像の下側を原点にするため、上段の指定だけ反転する。
+  tex.offset.set(col * 0.5, row === 0 ? 0.5 : 0);
+  return tex;
+}
+const APPARITION_MAPS = {
+  mirror: apparitionTexture(0, 0), toilet: apparitionTexture(1, 0),
+  hands: apparitionTexture(0, 1), window: apparitionTexture(1, 1),
+};
+
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
@@ -95,7 +112,8 @@ export class Haunts {
 
   _fire() {
     // 扉の異変を多めにし、物が落ちる現象は候補を一つだけにして頻度を抑える。
-    const all = ["opens", "opens", "passedOpens", "passedOpens", "sway", "roomLight", "blood", "pot", "outage"];
+    const all = ["opens", "opens", "passedOpens", "passedOpens", "sway", "roomLight", "blood", "pot", "outage",
+      "mirrorVisitor", "toiletVisitor", "reachingHands", "windowChild", "roomTint"];
     const able = all.filter((k) => k !== this.last && this._can(k));
     if (!able.length) { this.t = 8; return; }
     const k = pick(able);
@@ -106,6 +124,11 @@ export class Haunts {
     else if (k === "opens") this._opens();
     else if (k === "passedOpens") this._passedOpens();
     else if (k === "roomLight") this._roomLight();
+    else if (k === "mirrorVisitor") this._mirrorVisitor();
+    else if (k === "toiletVisitor") this._toiletVisitor();
+    else if (k === "reachingHands") this._reachingHands();
+    else if (k === "windowChild") this._windowChild();
+    else if (k === "roomTint") this._roomTint();
     else this._outage();
   }
 
@@ -119,6 +142,9 @@ export class Haunts {
     if (kind === "passedOpens") return inUnit && this._passedDoors().length > 0;
     if (kind === "roomLight") return !inUnit && this._farDoors(4, 18, false).length > 0;
     if (kind === "outage") return !inUnit && g.floor.lights.some((L) => !L.dead);
+    if (["mirrorVisitor", "toiletVisitor", "reachingHands", "windowChild", "roomTint"].includes(kind)) {
+      return inUnit && Boolean(g.curRoom && g.curRoom.unitBounds);
+    }
     return false;
   }
 
@@ -146,6 +172,107 @@ export class Haunts {
     o.t = 0;
     this.live.push(o);
     return o;
+  }
+
+  // 透明画像を常に主人公へ向ける板として作る。立体物の陰でも薄い紙に見えにくくするためである。
+  _apparition(map, w, h, x, y, z) {
+    const mat = new THREE.MeshBasicMaterial({ map, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const mesh = plane(w, h, mat);
+    mesh.position.set(x, y, z);
+    mesh.renderOrder = 9;
+    this.g.floor.group.add(mesh);
+    return { mesh, mat };
+  }
+
+  _fadeApparition(kind, mesh, mat, life, peak, rise = 0) {
+    const g = this.g;
+    const y0 = mesh.position.y;
+    let sounded = false;
+    this._add({
+      kind, life,
+      step: (e) => {
+        // 出現と消失を急に切り替えず、気づいた後にも本物か迷う時間を残す。
+        const a = Math.min(1, e.t / 1.15, (life - e.t) / 1.3);
+        mat.opacity = Math.max(0, a) * peak;
+        mesh.position.y = y0 + Math.min(1, e.t / 3.4) * rise;
+        mesh.lookAt(g.camera.position.x, mesh.position.y, g.camera.position.z);
+        if (!sounded && e.t > 0.35) { sounded = true; g.snd.whisper(); }
+      },
+      end: () => {
+        g.floor.group.remove(mesh);
+        mesh.geometry.dispose(); mat.dispose();
+      },
+    });
+  }
+
+  // 鏡の既存の人影を、輪郭の異なる生成した女へ一度だけ差し替える。
+  _mirrorVisitor() {
+    const g = this.g;
+    const mirrors = g.floor.fx.filter((f) => f.kind === "mirror");
+    if (!mirrors.length) { this.t = 8; return; }
+    const f = mirrors.reduce((a, b) => Math.hypot(b.x - g.player.pos.x, b.z - g.player.pos.z) < Math.hypot(a.x - g.player.pos.x, a.z - g.player.pos.z) ? b : a);
+    const oldMap = f.mesh.material.map;
+    f.mesh.material.map = APPARITION_MAPS.mirror;
+    f.mesh.material.needsUpdate = true;
+    f.ph = 0.0001;
+    f.t = 22 + rnd(0, 12);
+    g.snd.mirrorRing();
+    this._add({ life: 2.1, step: () => {}, end: () => { f.mesh.material.map = oldMap; f.mesh.material.needsUpdate = true; } });
+  }
+
+  // 便器の位置は全住戸で共通なので、陶器の内側から頭だけをゆっくり上げる。
+  _toiletVisitor() {
+    const b = this.g.curRoom.unitBounds;
+    const a = this._apparition(APPARITION_MAPS.toilet, 0.58, 0.72, b.x0 + 0.6, 0.31, b.z0 - 0.78);
+    this._fadeApparition("toiletVisitor", a.mesh, a.mat, 7.2, 0.96, 0.34);
+  }
+
+  // 家具そのものを動かす現象と区別し、押し入れ脇から腕だけが覗いて引っ込むようにする。
+  _reachingHands() {
+    const g = this.g, b = g.curRoom.unitBounds;
+    const right = Math.random() < 0.5;
+    const a = this._apparition(APPARITION_MAPS.hands, 1.18, 0.7, right ? b.x1 - 0.5 : b.x0 + 0.5, 0.62, b.z1 + 0.72);
+    this._fadeApparition("reachingHands", a.mesh, a.mat, 5.8, 0.9, 0.03);
+  }
+
+  // 奥の窓に子どもの影を置き、近づいて確かめきる前に消す。
+  _windowChild() {
+    const g = this.g, b = g.curRoom.unitBounds;
+    const a = this._apparition(APPARITION_MAPS.window, 0.86, 1.32, g.curRoom.dx, 1.27, b.z1 + 0.055);
+    let noticed = false;
+    this._add({
+      kind: "windowChild", life: 10,
+      step: (e) => {
+        const dist = Math.hypot(a.mesh.position.x - g.player.pos.x, a.mesh.position.z - g.player.pos.z);
+        const gone = dist < 2.35;
+        const fade = Math.min(1, e.t / 1.8, (e.life - e.t) / 1.2);
+        a.mat.opacity = gone ? Math.max(0, a.mat.opacity - 0.13) : Math.max(0, fade) * 0.78;
+        if (!noticed && e.t > 0.5) { noticed = true; g.snd.whisper(); }
+        if (gone && a.mat.opacity <= 0.01) e.life = e.t;
+      },
+      end: () => { g.floor.group.remove(a.mesh); a.mesh.geometry.dispose(); a.mat.dispose(); },
+    });
+  }
+
+  // 電球の色では説明できない青緑と赤を重ね、部屋全体が一瞬別の場所に変わったように見せる。
+  _roomTint() {
+    const g = this.g, b = g.curRoom.unitBounds;
+    const cold = new THREE.PointLight(0x264f63, 0, 8.5, 1.35);
+    const red = new THREE.PointLight(0x6a070b, 0, 5.5, 1.6);
+    cold.position.set(g.curRoom.dx, 1.75, (b.z0 + b.z1) / 2);
+    red.position.set(g.curRoom.dx + rnd(-1.2, 1.2), 0.55, b.z1 + 1.0);
+    g.floor.group.add(cold, red);
+    g.snd.switchFlip();
+    this._add({
+      kind: "roomTint", life: 9,
+      step: (e) => {
+        const k = Math.max(0, Math.min(1, e.t / 1.2, (e.life - e.t) / 1.5));
+        // r169 の物理光量では一桁だと畳や壁まで届かないため、色の変化が読める強さにする。
+        cold.intensity = 30 * k;
+        red.intensity = (9 + Math.sin(e.t * 0.75) * 4) * k;
+      },
+      end: () => { g.floor.group.remove(cold, red); cold.dispose(); red.dispose(); g.snd.switchFlip(); },
+    });
   }
 
   /* ---------------- ひとつずつ ---------------- */
