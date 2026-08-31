@@ -192,7 +192,8 @@ export class Net {
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "failed" || pc.connectionState === "disconnected") this._drop("host");
     };
-    const dc = pc.createDataChannel("game", { ordered: false, maxRetransmits: 0 });
+    // 開始や勝敗まで同じ経路を通るため、取りこぼしで片方だけ止まらないよう信頼できる通信にする。
+    const dc = pc.createDataChannel("game");
     this._bind("host", dc);
 
     const offer = await pc.createOffer();
@@ -208,7 +209,8 @@ export class Net {
 
   async _guestPoll() {
     if (this.role !== "guest" || !this.code) return;
-    const r = await this.call({ action: "poll", code: this.code });
+    // 接続後も在室を知らせる。止めると35秒後に同じ席を別の参加者へ渡してしまうため。
+    const r = await this.call({ action: "poll", code: this.code, who: this.slot });
     if (!r.ok) return;
     const slots = r.data.slots || {};
     const host = slots.host;
@@ -245,8 +247,7 @@ export class Net {
     this.dcs[slot] = dc;
     dc.onopen = () => {
       if (this.onMembers) this.onMembers();
-      // つながったら、待ち合わせの確認は止める
-      if (this.role === "guest") this.stopPolling();
+      // 後から入った参加者も顔ぶれへ加えるため、ゲーム開始までは確認を続ける。
       if (this.onReady) this.onReady();
     };
     dc.onclose = () => this._drop(slot);
@@ -281,6 +282,16 @@ export class Net {
   }
 
   // ホストへ（ゲストのとき）
+  // ホストが開始時に確定した顔ぶれを受け取り、全端末で同じ参加者を作る。
+  syncMembers(members) {
+    if (!members || typeof members !== "object") return;
+    const next = {};
+    ["host", "g1", "g2", "g3"].forEach((slot) => {
+      if (typeof members[slot] === "string" && members[slot]) next[slot] = members[slot].slice(0, 16);
+    });
+    if (next.host) this.members = next;
+  }
+
   toHost(obj) { this.send("host", obj); }
 
   async begin() {

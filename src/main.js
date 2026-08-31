@@ -283,6 +283,8 @@ function drawRoster() {
 
 function openLobby() {
   snd.unlock(); snd.ui();
+  // 初期画面より手前にロビーを出し、開始後も初期画面がゲームを覆わないようにする。
+  $("gate").classList.remove("show");
   $("lobby").classList.add("show");
   $("lobbyMake").style.display = "";
   $("lobbyWait").style.display = "none";
@@ -353,11 +355,19 @@ $("startGame").onclick = async () => {
   g.onQuitVersus = quitVersus;
   closeLobby();
   await g.startVersus(versus, lobbyFloor, oni, keys);
-  net.broadcast({ t: "go", oni: oni, floor: lobbyFloor, keys: versus.keys.map((k) => ({ x: k.x, z: k.z })) });
+  // 開始時の顔ぶれも一緒に確定し、参加した順番に関係なく全端末で同じ人数にする。
+  net.broadcast({
+    t: "go", oni: oni, floor: lobbyFloor,
+    members: { ...net.members },
+    keys: versus.keys.map((k) => ({ x: k.x, z: k.z })),
+  });
 };
 
 function lobbyMessage(from, o) {
   if (!o || o.t !== "go") return;
+  net.stopPolling();
+  net.started = true;
+  net.syncMembers(o.members);
   const g = ensureGame();
   versus = new Versus(g, net);
   versus.onAgain = () => location.reload();
@@ -378,6 +388,8 @@ $("lobbyClose").onclick = async () => {
   snd.ui();
   await net.leave();
   closeLobby();
+  // ロビーをやめた時だけ、元の初期画面へ戻す。
+  $("gate").classList.add("show");
   if (game && game.running) game.resume();
 };
 

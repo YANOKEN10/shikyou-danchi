@@ -128,6 +128,11 @@ module.exports = async function handler(req, res) {
     /* --- 様子を見る --- */
     if (action === "poll") {
       const slots = { host: room.host };
+      // WebRTCがつながった後も席を予約し続け、待機中の別参加者による上書きを防ぐ。
+      if (WHO_RE.test(who) && room[who]) {
+        room[who].seen = Date.now();
+        await S.writeJson(roomKey(code), room);
+      }
       for (let i = 1; i <= 3; i++) { const s = "g" + i; if (room[s]) slots[s] = room[s]; }
       res.status(200).json({ slots: slots, open: room.open !== false, floor: room.floor });
       return;
