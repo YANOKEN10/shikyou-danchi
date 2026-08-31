@@ -8,6 +8,9 @@
 const API = "/api/room";
 const POLL = 2000;          // つながるまでの、待ち合わせの確認間隔
 const ICE_WAIT = 700;       // 通信経路の候補は、まとめて送る
+const RELAY_WAIT = 8000;    // 4Gなどで直通できないときは、待ち続けずサーバー中継へ切り替える
+const RELAY_POLL = 300;
+const RELAY_STATE = 120;    // 位置は最新だけあればよいので、中継時の書き込みを抑える
 
 function rtcConfig() {
   return {
@@ -28,6 +31,8 @@ export class Net {
   reset() {
     if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
     if (this.iceTimer) { clearTimeout(this.iceTimer); this.iceTimer = null; }
+    if (this.relayTimer) { clearInterval(this.relayTimer); this.relayTimer = null; }
+    for (const k in (this.relayWaiters || {})) clearTimeout(this.relayWaiters[k]);
     for (const k in (this.pcs || {})) { try { this.pcs[k].close(); } catch (e) { /* もう閉じている */ } }
     this.role = null;          // "host" | "guest"
     this.code = "";
@@ -36,6 +41,11 @@ export class Net {
     this.pcs = {};             // slot -> RTCPeerConnection
     this.dcs = {};             // slot -> RTCDataChannel
     this.members = {};         // slot -> 名前
+    this.relaySlots = new Set();
+    this.relayWaiters = {};
+    this.relaySeen = {};
+    this.relaySeq = 0;
+    this.relayLastState = 0;
     this.iceQueue = [];
     this.started = false;
     this.floor = 1;
@@ -46,14 +56,14 @@ export class Net {
   }
 
   get connected() {
-    if (this.role === "guest") return Boolean(this.dcs.host && this.dcs.host.readyState === "open");
+    if (this.role === "guest") return Boolean((this.dcs.host && this.dcs.host.readyState === "open") || this.relaySlots.has("host"));
     return this.openCount() > 0;
   }
 
   openCount() {
-    let n = 0;
-    for (const k in this.dcs) if (this.dcs[k].readyState === "open") n++;
-    return n;
+    const ready = new Set(this.relaySlots);
+    for (const k in this.dcs) if (this.dcs[k].readyState === "open") ready.add(k);
+    return ready.size;
   }
 
   // ロビーに並べる顔ぶれ
@@ -62,8 +72,9 @@ export class Net {
     for (let i = 1; i <= 3; i++) {
       const s = "g" + i;
       if (!this.members[s]) continue;
-      const ok = this.role === "guest" ? true : Boolean(this.dcs[s] && this.dcs[s].readyState === "open");
-      out.push({ slot: s, name: this.members[s], ok: ok });
+      const relay = this.relaySlots.has(this.role === "guest" ? "host" : s);
+      const ok = this.role === "guest" ? this.connected : Boolean((this.dcs[s] && this.dcs[s].readyState === "open") || relay);
+      out.push({ slot: s, name: this.members[s], ok: ok, relay: relay });
     }
     return out;
   }
@@ -105,6 +116,43 @@ export class Net {
 
   /* ---------------- 部屋を作る（ホスト） ---------------- */
 
+  // 直通できない回線でも遊べるよう、同じゲーム通信を短いHTTP中継へ退避する。
+  _armRelay(slot) {
+    if (this.relayWaiters[slot]) clearTimeout(this.relayWaiters[slot]);
+    this.relayWaiters[slot] = setTimeout(() => {
+      const dc = this.dcs[slot];
+      if (!dc || dc.readyState !== "open") this._useRelay(slot);
+    }, RELAY_WAIT);
+  }
+
+  _useRelay(slot) {
+    if (this.relaySlots.has(slot)) return;
+    this.relaySlots.add(slot);
+    if (!this.relayTimer) this.relayTimer = setInterval(() => this._relayPoll(), RELAY_POLL);
+    if (this.onMembers) this.onMembers();
+    if (this.onReady) this.onReady();
+  }
+
+  async _relayPoll() {
+    if (!this.code || !this.role || !this.relaySlots.size) return;
+    const who = this.role === "host" ? "host" : this.slot;
+    const r = await this.call({ action: "relayPoll", code: this.code, who: who, seen: this.relaySeen });
+    if (!r.ok) return;
+    (r.data.messages || []).forEach((m) => {
+      this.relaySeen[m.id] = m.seq;
+      if (this.onMessage) this.onMessage(m.from, m.data);
+    });
+  }
+
+  _relaySend(to, obj) {
+    const lane = obj && (obj.t === "p" || obj.t === "s") ? "state" : "control";
+    const now = Date.now();
+    if (lane === "state" && now - this.relayLastState < RELAY_STATE) return;
+    if (lane === "state") this.relayLastState = now;
+    const who = this.role === "host" ? "host" : this.slot;
+    this.call({ action: "relay", code: this.code, who: who, to: to, lane: lane, seq: ++this.relaySeq, data: obj });
+  }
+
   async host(name, floor) {
     this.reset();
     this.role = "host";
@@ -144,13 +192,14 @@ export class Net {
   async _hostAnswer(slot, offer) {
     const pc = new RTCPeerConnection(rtcConfig());
     this.pcs[slot] = pc;
+    this._armRelay(slot);
     pc._seen = 0;
     pc.onicecandidate = (e) => {
       if (e.candidate) this.queueIce({ to: slot, c: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate });
     };
     pc.ondatachannel = (e) => this._bind(slot, e.channel);
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") this._drop(slot);
+      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") this._useRelay(slot);
     };
     try {
       await pc.setRemoteDescription(offer);
@@ -190,12 +239,13 @@ export class Net {
       if (e.candidate) this.queueIce({ to: "host", c: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate });
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") this._drop("host");
+      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") this._useRelay("host");
     };
     // 開始や勝敗まで同じ経路を通るため、取りこぼしで片方だけ止まらないよう信頼できる通信にする。
     const dc = pc.createDataChannel("game");
     this._bind("host", dc);
 
+    this._armRelay("host");
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     await this.call({
@@ -247,10 +297,12 @@ export class Net {
     this.dcs[slot] = dc;
     dc.onopen = () => {
       if (this.onMembers) this.onMembers();
+      if (this.relayWaiters[slot]) { clearTimeout(this.relayWaiters[slot]); delete this.relayWaiters[slot]; }
+      this.relaySlots.delete(slot);
       // 後から入った参加者も顔ぶれへ加えるため、ゲーム開始までは確認を続ける。
       if (this.onReady) this.onReady();
     };
-    dc.onclose = () => this._drop(slot);
+    dc.onclose = () => { if (!this.relaySlots.has(slot)) this._drop(slot); };
     dc.onmessage = (e) => {
       let obj = null;
       try { obj = JSON.parse(e.data); } catch (err) { return; }
@@ -268,8 +320,11 @@ export class Net {
 
   send(slot, obj) {
     const dc = this.dcs[slot];
-    if (!dc || dc.readyState !== "open") return;
-    try { dc.send(JSON.stringify(obj)); } catch (e) { /* 落ちても次で送り直す */ }
+    if (dc && dc.readyState === "open") {
+      try { dc.send(JSON.stringify(obj)); } catch (e) { /* 落ちても次で送り直す */ }
+      return;
+    }
+    if (this.relaySlots.has(slot)) this._relaySend(slot, obj);
   }
 
   broadcast(obj) {
@@ -279,6 +334,7 @@ export class Net {
       if (dc.readyState !== "open") continue;
       try { dc.send(s); } catch (e) { /* 同上 */ }
     }
+    if (this.relaySlots.size) this._relaySend("*", obj);
   }
 
   // ホストへ（ゲストのとき）

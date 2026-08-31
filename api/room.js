@@ -17,6 +17,7 @@ const GONE = 35 * 1000;        // これだけ音沙汰がなければ、空き
 const MAX_ICE = 40;
 
 function roomKey(code) { return "sk/room/" + code + ".json"; }
+function relayKey(code, who, lane) { return "sk/relay/" + code + "-" + who + "-" + lane + ".json"; }
 
 function makeCode() {
   const b = crypto.randomBytes(4);
@@ -125,6 +126,36 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    /* --- 直通できない回線の中継 --- */
+    if (action === "relay") {
+      const to = String(b.to || "");
+      if (!WHO_RE.test(who) || !room[who] || !(to === "*" || (WHO_RE.test(to) && room[to]))) {
+        res.status(400).json({ error: "relay" }); return;
+      }
+      const lane = b.lane === "control" ? "control" : "state";
+      const packet = { from: who, to: to, lane: lane, seq: Math.max(1, Number(b.seq) || 1), at: Date.now(), data: b.data && typeof b.data === "object" ? b.data : {} };
+      await S.writeJson(relayKey(code, who, lane), packet);
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    if (action === "relayPoll") {
+      if (!WHO_RE.test(who) || !room[who]) { res.status(400).json({ error: "who" }); return; }
+      const senders = who === "host" ? ["g1", "g2", "g3"] : ["host"];
+      const reads = [];
+      senders.forEach((s) => ["state", "control"].forEach((lane) => reads.push(S.readJson(relayKey(code, s, lane)))));
+      const packets = await Promise.all(reads);
+      const seen = b.seen && typeof b.seen === "object" ? b.seen : {};
+      const messages = packets.filter((p) => {
+        if (!p || (p.to !== "*" && p.to !== who)) return false;
+        const id = p.from + ":" + p.lane;
+        p.id = id;
+        return Number(p.seq) > (Number(seen[id]) || 0);
+      });
+      res.status(200).json({ messages: messages });
+      return;
+    }
+
     /* --- 様子を見る --- */
     if (action === "poll") {
       const slots = { host: room.host };
@@ -141,6 +172,11 @@ module.exports = async function handler(req, res) {
     /* --- 片づける --- */
     if (action === "close") {
       await S.removeJson(roomKey(code));
+      // 合言葉が将来再利用されても古い開始通知が届かないよう、中継箱も一緒に消す。
+      const relayDeletes = [];
+      ["host", "g1", "g2", "g3"].forEach((s) => ["state", "control"].forEach((lane) => relayDeletes.push(S.removeJson(relayKey(code, s, lane)))));
+      await Promise.all(relayDeletes);
+
       res.status(200).json({ ok: true });
       return;
     }

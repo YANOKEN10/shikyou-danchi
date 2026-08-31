@@ -269,7 +269,7 @@ function drawRoster() {
     nm.textContent = r.name;
     const tag = document.createElement("span");
     tag.className = "tagm";
-    tag.textContent = r.slot === "host" ? "部屋の主" : (r.ok ? "つながった" : "つないでいます…");
+    tag.textContent = r.slot === "host" ? "部屋の主" : (r.ok ? (r.relay ? "中継でつながった" : "つながった") : "つないでいます…");
     d.appendChild(dot); d.appendChild(nm); d.appendChild(tag);
     box.appendChild(d);
   });
