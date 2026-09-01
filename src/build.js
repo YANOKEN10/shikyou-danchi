@@ -406,11 +406,14 @@ function commonWetArea(C) {
 
   // 浴槽は縁と底を別にして、実際に中へ踏み込める洗い場を手前へ確保する。
   const tubZ = z0 - 2.48;
-  C.pb(1.18, 0.5, 0.08, mats.porcelain, left + 0.69, 0.25, tubZ - 0.43);
-  C.pb(0.08, 0.5, 0.86, mats.porcelain, left + 0.14, 0.25, tubZ);
-  C.pb(0.08, 0.5, 0.86, mats.porcelain, right - 0.14, 0.25, tubZ);
-  C.pb(1.18, 0.12, 0.86, mats.porcelain, left + 0.69, 0.06, tubZ);
-  C.blk(left + 0.08, tubZ - 0.48, right - 0.08, tubZ + 0.48);
+  const tubW = 0.72, tubD = 0.76, tubX = left + 0.43;
+  // 浴槽が戸口まで張り出すとプレイヤー半径を含めた通路が消えるため、小型の深い浴槽を左奥へ寄せる。
+  C.pb(tubW, 0.5, 0.08, mats.porcelain, tubX, 0.25, tubZ - tubD / 2);
+  C.pb(0.08, 0.5, tubD, mats.porcelain, tubX - tubW / 2, 0.25, tubZ);
+  C.pb(0.08, 0.5, tubD, mats.porcelain, tubX + tubW / 2, 0.25, tubZ);
+  C.pb(tubW, 0.12, tubD, mats.porcelain, tubX, 0.06, tubZ);
+  // 右側に約70cmの洗い場を残し、扉から奥まで直線で歩ける当たり判定にする。
+  C.blk(tubX - tubW / 2 - 0.04, tubZ - tubD / 2 - 0.04, tubX + tubW / 2 + 0.04, tubZ + tubD / 2 + 0.04);
 
   // 浴室の鏡は洗い場から正面に見える位置へ置き、見続けたときだけ人影を出す。
   addWetMirror(C, left + 0.035, 1.35, z0 - 2.02, Math.PI / 2, 0.52, 0.68, "風呂の鏡を覗く");
