@@ -1350,7 +1350,8 @@ export function buildEntity() {
   const g = new THREE.Group();
   const H = 1.92;                 // 見上げる高さ
 
-  const cloth = new THREE.MeshLambertMaterial({ map: TX.shroud(), color: 0xe8e8f0 });
+  // 正面の生成画像を主役にしつつ、横からは衣服の厚みが読める暗さへ抑える。
+  const cloth = new THREE.MeshLambertMaterial({ map: TX.shroud(), color: 0x343740 });
   const clothDark = new THREE.MeshLambertMaterial({ color: 0x131318 });
   // 懐中電灯を至近で当てても白く飛ばない暗さにする。顔は下の絵で見せる
   const skin = new THREE.MeshLambertMaterial({ color: 0x171512 });   // 頭は暗く。顔は下の絵で見せる
@@ -1440,16 +1441,14 @@ export function buildEntity() {
   bang.visible = false;
   headPivot.add(bang);
 
-  // 生成画像へ切り替えたあとも旧立体モデルが背後で描画され、透明部分や横から
-  // 古い胴体・頭髪がはみ出していた。影と当たり判定は別なので、旧外観だけを止める。
-  body.visible = false;
-  hem.visible = false;
-  neck.visible = false;
-  headPivot.visible = false;
-  arms.forEach((arm) => { arm.visible = false; });
+  // 旧Canvas顔と四角い前髪だけは消したまま、胴・頭・髪・腕を暗い芯として残す。
+  // 写真一枚だけでは真横から厚さがゼロになるため、生成画像の輪郭より内側に立体を収める。
+  body.scale.z = 0.78;
+  hem.scale.z = 0.82;
+  skull.scale.z = 0.92;
+  veil.scale.z = 0.84;
 
-  // 当たり判定はキャラクター位置から計算されるため、外観は生成画像だけで見せる。
-  // 顔が髪で隠れない全身素材なので、遠距離は人影、近距離は異様な表情として読める。
+  // 顔が髪で隠れない全身素材は正面の表情を担当し、立体側は側面と背面だけを補う。
   const photoMat = new THREE.MeshBasicMaterial({
     map: generatedEntity, transparent: true, alphaTest: 0.045,
     // 黒背景は加算合成では光を足さないため消え、肌と衣服の細部だけを立体へ重ねられる。
@@ -1458,7 +1457,7 @@ export function buildEntity() {
   });
   const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.28, H), photoMat);
   // 胴体より手前へ出し、立体が写真面を突き抜けて胸元に穴のような形を作らないようにする。
-  photo.position.set(0, H / 2, 0.39);
+  photo.position.set(0, H / 2, 0.32);
   g.add(photo);
 
   // この一体だけ、別の層で照らす（懐中電灯で白飛びさせないため）
