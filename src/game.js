@@ -747,9 +747,10 @@ export class Game {
     this.turnLook = Math.max(0, (this.turnLook || 0) - dt * 1.5) + Math.abs(turn);
     if (this.turnLook > 2.25 && this.apparCooldown <= 0 && !this.player.inUnit && def.n >= 3) {
       const f = this.player.forward();
-      const x = this.player.pos.x + f.x * 1.05;
-      const z = this.player.pos.z + f.z * 1.05;
-      if (this._showApparition(x, z, 3.2, { mode: "approach", speed: 0.16, scale: 1.08 })) {
+      const x = this.player.pos.x + f.x * 0.44;
+      const z = this.player.pos.z + f.z * 0.44;
+      // 振り向きざまは顔が画面を覆う距離へ置き、遠くから歩いてくる演出との差をはっきりさせる。
+      if (this._showApparition(x, z, 3.2, { mode: "approach", speed: 0.16, stopDistance: 0.34, scale: 1.38 })) {
         this.snd.stinger(); this.ui.hit();
         this.apparCooldown = 28 + Math.random() * 24;
       }
@@ -766,7 +767,9 @@ export class Game {
           const roll = Math.random();
           let shown = false;
           if (roll < 0.24) {
-            shown = this._showApparition(p.x + f.x * 0.78, p.z + f.z * 0.78, 0.48, { scale: 1.22 });
+            // 短い飛び出しは添付参考のように背景がほぼ消える距離で顔を見せる。
+            shown = this._showApparition(p.x + f.x * 0.4, p.z + f.z * 0.4, 0.62,
+              { mode: "approach", speed: 0.9, stopDistance: 0.32, scale: 1.42 });
             if (shown) { this.snd.stinger(); this.ui.hit(); }
           } else if (roll < 0.72) {
             const x = Math.max(0.9, Math.min(this.floor.len - 0.9, p.x + f.x * 3.8));

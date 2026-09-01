@@ -288,6 +288,7 @@ export class Apparition {
     this.life = sec || 1.4;
     this.mode = o.mode || "still";
     this.speed = o.speed || 0.28;
+    this.stopDistance = o.stopDistance || 0.68;
   }
 
   update(dt, player) {
@@ -299,15 +300,16 @@ export class Apparition {
     const dz = player.pos.z - this.mesh.position.z;
     const dist = Math.hypot(dx, dz);
     this.mesh.rotation.y = Math.atan2(dx, dz);
-    if (this.mode === "approach" && dist > 0.68) {
-      const step = Math.min(dist - 0.68, this.speed * dt);
+    if (this.mode === "approach" && dist > this.stopDistance) {
+      // 顔面を見せる近接演出だけ停止距離を短くし、通常の追跡姿まで常に画面へ貼り付かせない。
+      const step = Math.min(dist - this.stopDistance, this.speed * dt);
       this.mesh.position.x += dx / dist * step;
       this.mesh.position.z += dz / dist * step;
     }
     if (this.life <= 0) this.mesh.visible = false;
   }
 
-  hide() { this.mesh.visible = false; this.life = 0; this.mesh.scale.setScalar(1); }
+  hide() { this.mesh.visible = false; this.life = 0; this.stopDistance = 0.68; this.mesh.scale.setScalar(1); }
 
   dispose() { this.scene.remove(this.mesh); }
 }

@@ -115,7 +115,7 @@ export class Haunts {
   _fire() {
     // 扉の異変を多めにし、物が落ちる現象は候補を一つだけにして頻度を抑える。
     const all = ["opens", "opens", "passedOpens", "passedOpens", "sway", "roomLight", "blood", "pot", "outage",
-      "mirrorVisitor", "toiletVisitor", "reachingHands", "windowChild", "roomTint"];
+      "mirrorVisitor", "toiletVisitor", "reachingHands", "windowChild", "cameraVisitor", "roomTint"];
     const able = all.filter((k) => k !== this.last && this._can(k));
     if (!able.length) { this.t = 8; return; }
     const k = pick(able);
@@ -130,6 +130,7 @@ export class Haunts {
     else if (k === "toiletVisitor") this._toiletVisitor();
     else if (k === "reachingHands") this._reachingHands();
     else if (k === "windowChild") this._windowChild();
+    else if (k === "cameraVisitor") this._cameraVisitor();
     else if (k === "roomTint") this._roomTint();
     else this._outage();
   }
@@ -144,7 +145,7 @@ export class Haunts {
     if (kind === "passedOpens") return inUnit && this._passedDoors().length > 0;
     if (kind === "roomLight") return !inUnit && this._farDoors(4, 18, false).length > 0;
     if (kind === "outage") return !inUnit && g.floor.lights.some((L) => !L.dead);
-    if (["mirrorVisitor", "toiletVisitor", "reachingHands", "windowChild", "roomTint"].includes(kind)) {
+    if (["mirrorVisitor", "toiletVisitor", "reachingHands", "windowChild", "cameraVisitor", "roomTint"].includes(kind)) {
       return inUnit && Boolean(g.curRoom && g.curRoom.unitBounds);
     }
     return false;
@@ -253,6 +254,32 @@ export class Haunts {
         if (gone && a.mat.opacity <= 0.01) e.life = e.t;
       },
       end: () => { g.floor.group.remove(a.mesh); a.mesh.geometry.dispose(); a.mat.dispose(); },
+    });
+  }
+
+  // 「それ」以外にも顔面距離の一瞬を作り、便器や鏡の定位置だけを探せば安全という慣れを崩す。
+  _cameraVisitor() {
+    const g = this.g;
+    const f = g.player.forward();
+    const dist = 0.3;
+    const mat = new THREE.MeshBasicMaterial({
+      map: APPARITION_MAPS.toilet, transparent: true, opacity: 0, depthWrite: false,
+      depthTest: false, side: THREE.DoubleSide,
+    });
+    // 画像の顔が縦画面・横画面のどちらでも端まで迫り、背景がほぼ残らない寸法にする。
+    const mesh = plane(0.66, 0.86, mat);
+    mesh.position.set(g.camera.position.x + f.x * dist, g.camera.position.y - 0.01, g.camera.position.z + f.z * dist);
+    mesh.lookAt(g.camera.position.x, mesh.position.y, g.camera.position.z);
+    mesh.renderOrder = 30;
+    g.floor.group.add(mesh);
+    g.snd.stinger(); g.ui.hit();
+    this._add({
+      kind: "cameraVisitor", life: 0.78,
+      step: (e) => {
+        // 瞬間表示でも一枚絵の点滅に見えないよう、短い出現・静止・消失の順にする。
+        mat.opacity = Math.min(1, e.t / 0.08, (e.life - e.t) / 0.2) * 0.98;
+      },
+      end: () => { g.floor.group.remove(mesh); mesh.geometry.dispose(); mat.dispose(); },
     });
   }
 
