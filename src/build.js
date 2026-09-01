@@ -59,6 +59,7 @@ const generatedWall = generatedTexture("./assets/generated/wall-aged.webp", 2, 1
 const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 2, 2);
 // URLを更新して旧版がブラウザキャッシュに残っていても、現在の「それ」を必ず再取得させる。
 const generatedEntity = generatedTexture("./assets/generated/entity-photoreal.webp?v=20260830-2");
+const generatedEntityPoses = generatedTexture("./assets/generated/entity-poses-atlas-v1.png?v=20260901");
 const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-v2.png?v=20260830");
 const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v1.png?v=20260831");
 // 四分割素材では鏡の中で顔が小さく潰れたため、鏡だけは縦長の専用画像を原寸で使う。
@@ -75,6 +76,19 @@ function interiorTexture(col, row) {
   tex.offset.set(col / 3, row === 0 ? 1 / 2 : 0);
   return tex;
 }
+
+// 体を縦につぶしただけの姿勢に見せないため、生成した四体勢を原寸の区画から切り出す。
+function entityPoseTexture(col, row) {
+  const tex = generatedEntityPoses.clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1 / 2, 1 / 2);
+  tex.offset.set(col / 2, row === 0 ? 1 / 2 : 0);
+  return tex;
+}
+const ENTITY_POSE_MAPS = {
+  crouch: entityPoseTexture(0, 0), crawl: entityPoseTexture(1, 0),
+  lean: entityPoseTexture(0, 1), kneel: entityPoseTexture(1, 1),
+};
 
 // 水回り専用の四区画素材。共通画像から切り出して床・戸・照明の年代感を揃える。
 function wetAreaTexture(col, row) {
@@ -1567,10 +1581,25 @@ export function buildEntity() {
 
   g.userData = {
     body, hem, shadow, arms, headPivot, face: faceMat, veil, photo,
+    defaultPhoto: generatedEntity, poseMaps: ENTITY_POSE_MAPS, pose: "stand", poseMap: generatedEntity,
     phase: Math.random() * 6, twitch: 2 + Math.random() * 4, tilt: 0, H,
     hemT: Math.random() * 10,
   };
   return g;
+}
+
+// 本体と演出用の分身が同じ体勢素材を使えるよう、切替処理を一か所に集める。
+export function setEntityPose(ent, pose) {
+  const u = ent && ent.userData;
+  if (!u || !u.photo) return;
+  const next = pose && u.poseMaps[pose] ? pose : "stand";
+  const map = next === "stand" ? u.defaultPhoto : u.poseMaps[next];
+  if (u.poseMap !== map) {
+    u.poseMap = map;
+    u.photo.material.map = map;
+    u.photo.material.needsUpdate = true;
+  }
+  u.pose = next;
 }
 
 /* ---------- 友達（住人）の姿 ---------- */
@@ -1629,7 +1658,19 @@ export function animateEntity(ent, dt, moving) {
   u.body.rotation.z = s * (moving ? 0.022 : 0.006);
   // 写実素材にも呼吸のような微動だけを与え、板絵に見える静止感を弱める。
   u.photo.rotation.z = s * (moving ? 0.012 : 0.003);
-  u.photo.scale.x = 1 + Math.sin(u.phase * 0.53) * 0.006;
+  const breathe = 1 + Math.sin(u.phase * 0.53) * 0.006;
+  u.photo.scale.set(breathe, 1, 1);
+  u.photo.position.y = u.H / 2;
+
+  // 体勢画像は正方形の区画なので、姿勢ごとに縦横比と床からの高さを戻す。
+  if (u.pose === "crouch") { u.photo.scale.set(1.14 * breathe, 0.66, 1); u.photo.position.y = 0.66; }
+  else if (u.pose === "crawl") { u.photo.scale.set(1.2 * breathe, 0.62, 1); u.photo.position.y = 0.61; }
+  else if (u.pose === "lean") { u.photo.scale.set(1.02 * breathe, 0.92, 1); u.photo.position.y = 0.92; }
+  else if (u.pose === "kneel") { u.photo.scale.set(1.04 * breathe, 0.86, 1); u.photo.position.y = 0.85; }
+  const coreVisible = u.pose === "stand";
+  // 別姿勢の実写面と直立した立体芯を重ねると手足が増えるため、その間だけ芯を隠す。
+  u.body.visible = coreVisible; u.hem.visible = coreVisible; u.headPivot.visible = coreVisible;
+  u.arms.forEach((arm) => { arm.visible = coreVisible; });
 
   // 裾。歩いているときほど後ろへ流れ、房ごとにばらばらに揺れる
   u.hemT += dt * (moving ? 2.4 : 0.9);

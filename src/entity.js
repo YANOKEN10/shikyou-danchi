@@ -5,7 +5,7 @@
 //   ・懐中電灯を向けると一瞬止まりますが、そのあと速くなります。
 // ============================================================
 import * as THREE from "../lib/three.module.js";
-import { buildEntity, animateEntity } from "./build.js";
+import { buildEntity, animateEntity, setEntityPose } from "./build.js";
 
 const LANE_Z = 1.25;
 
@@ -182,20 +182,27 @@ export class Stalker {
       this.moving = false;
     }
 
-    // 少しだけ横に揺れる
+    // 体勢ごとの生成素材へ切り替え、同じ直立姿を傾けただけに見せない。
+    setEntityPose(this.mesh, this.dreadPose || "stand");
     if (this.dreadPose === "crawl") {
       this.dreadT = Math.max(0, (this.dreadT || 0) - dt);
       this.z = LANE_Z + Math.sin(performance.now() * 0.0048 + this.x) * 0.62;
-      // 全身を低く横倒しにし、単なる背の低い立ち姿ではなく床を這う輪郭へ変える。
-      this.mesh.scale.y += (0.62 - this.mesh.scale.y) * Math.min(1, dt * 8);
-      this.mesh.scale.x += (0.92 - this.mesh.scale.x) * Math.min(1, dt * 8);
-      this.mesh.rotation.z += (1.22 - this.mesh.rotation.z) * Math.min(1, dt * 7);
+      this.mesh.rotation.z += (0.04 - this.mesh.rotation.z) * Math.min(1, dt * 7);
+    } else if (this.dreadPose === "crouch") {
+      this.z = LANE_Z + Math.sin(performance.now() * 0.0038 + this.x) * 0.32;
+      this.mesh.rotation.z += (0.08 - this.mesh.rotation.z) * Math.min(1, dt * 7);
+    } else if (this.dreadPose === "lean") {
+      this.z = LANE_Z + Math.sin(performance.now() * 0.0028 + this.x) * 0.46;
+      this.mesh.rotation.z += (0.16 - this.mesh.rotation.z) * Math.min(1, dt * 7);
+    } else if (this.dreadPose === "kneel") {
+      this.z = LANE_Z + Math.sin(performance.now() * 0.0022 + this.x) * 0.2;
+      this.mesh.rotation.z += (-0.1 - this.mesh.rotation.z) * Math.min(1, dt * 7);
     } else {
       this.z = LANE_Z + Math.sin(performance.now() * 0.0006 + this.x) * 0.07;
-      this.mesh.scale.y += (1 - this.mesh.scale.y) * Math.min(1, dt * 8);
-      this.mesh.scale.x += (1 - this.mesh.scale.x) * Math.min(1, dt * 8);
       this.mesh.rotation.z += (0 - this.mesh.rotation.z) * Math.min(1, dt * 7);
     }
+    this.mesh.scale.x += (1 - this.mesh.scale.x) * Math.min(1, dt * 8);
+    this.mesh.scale.y += (1 - this.mesh.scale.y) * Math.min(1, dt * 8);
 
     this.mesh.position.set(this.x, 0, this.z);
     const face = (goal - this.x) >= 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -289,6 +296,9 @@ export class Apparition {
     this.mode = o.mode || "still";
     this.speed = o.speed || 0.28;
     this.stopDistance = o.stopDistance || 0.68;
+    const poses = ["stand", "crouch", "crawl", "lean", "kneel"];
+    this.pose = o.pose || poses[Math.floor(Math.random() * poses.length)];
+    setEntityPose(this.mesh, this.pose);
   }
 
   update(dt, player) {
@@ -309,7 +319,10 @@ export class Apparition {
     if (this.life <= 0) this.mesh.visible = false;
   }
 
-  hide() { this.mesh.visible = false; this.life = 0; this.stopDistance = 0.68; this.mesh.scale.setScalar(1); }
+  hide() {
+    this.mesh.visible = false; this.life = 0; this.stopDistance = 0.68; this.mesh.scale.setScalar(1);
+    setEntityPose(this.mesh, "stand");
+  }
 
   dispose() { this.scene.remove(this.mesh); }
 }

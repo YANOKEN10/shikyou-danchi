@@ -137,10 +137,10 @@ export class DreadDirector {
     }, end: () => { d.pivot.rotation.y = 0; d.busy = false; g.appar.hide(); } });
   }
 
-  // 低い姿勢と横揺れを一時的に許可し、いつもの人型の速度感を崩す。
+  // 低い姿勢だけに固定せず、遭遇ごとに異なる輪郭と重心で移動させる。
   _crawl() {
     const s = this._firstStalker();
-    s.dreadPose = "crawl"; s.dreadT = 9;
+    s.dreadPose = pick(["crouch", "crawl", "lean", "kneel"]); s.dreadT = 9;
     this.g.snd.spatialBreath(Math.random() < 0.5 ? -1 : 1);
     this.g.snd.sample("wet-cloth-drag", { vol: 0.34, pan: rnd(-0.5, 0.5), wet: 0.4 });
     setTimeout(() => this.g.snd.sample("joint-cracks", { vol: 0.32, pan: rnd(-0.7, 0.7) }), 850);
