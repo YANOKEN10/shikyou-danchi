@@ -64,6 +64,7 @@ const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v
 // 四分割素材では鏡の中で顔が小さく潰れたため、鏡だけは縦長の専用画像を原寸で使う。
 const generatedMirrorGhost = generatedTexture("./assets/generated/mirror-ghost-v2.png?v=20260901");
 const roomSurfacesAtlas = generatedTexture("./assets/generated/room-surfaces-atlas-v1.png?v=20260901");
+const butsudanAtlas = generatedTexture("./assets/generated/butsudan-atlas-v1.png?v=20260901");
 
 // 一枚の生成画像を六つの素材へ切り分け、通信量を増やさず家具ごとの質感を変える。
 function interiorTexture(col, row) {
@@ -87,6 +88,15 @@ function wetAreaTexture(col, row) {
 // 台所床・水回り壁・トイレ床・浴室床を別面として切り出し、同じ模様が壁から床へ続く不自然さを防ぐ。
 function roomSurfaceTexture(col, row) {
   const tex = roomSurfacesAtlas.clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1 / 2, 1 / 2);
+  tex.offset.set(col / 2, row === 0 ? 1 / 2 : 0);
+  return tex;
+}
+
+// 仏壇は扉・金箔・位牌・敷物で材質が違うため、専用画像を四面に分けて立体の輪郭を読みやすくする。
+function butsudanTexture(col, row) {
+  const tex = butsudanAtlas.clone();
   tex.needsUpdate = true;
   tex.repeat.set(1 / 2, 1 / 2);
   tex.offset.set(col / 2, row === 0 ? 1 / 2 : 0);
@@ -554,17 +564,82 @@ const FURNISH = {
   // 仏間
   butsudan(C) {
     const { mats, dx, x0, x1, z1, zMid, H } = C;
-    // 仏壇（黒檀の箱に、内側だけ金色）
-    C.pb(1.0, 1.55, 0.55, mats.darkwood, x0 + 0.8, 0.78, z1 + 0.35);
+    const cx = x0 + 0.8, front = z1 + 0.64;
+    // 外箱を一枚の箱にせず、台輪・柱・屋根を重ねて古い大型仏壇の段差と影を出す。
+    C.pb(1.18, 0.12, 0.62, mats.butsudanWood, cx, 0.06, z1 + 0.34);
+    C.pb(1.08, 0.12, 0.58, mats.butsudanWood, cx, 0.16, z1 + 0.34);
+    C.pb(1.02, 1.34, 0.52, mats.butsudanWood, cx, 0.88, z1 + 0.32);
+    C.pb(0.09, 1.25, 0.08, mats.butsudanWood, cx - 0.48, 0.91, front);
+    C.pb(0.09, 1.25, 0.08, mats.butsudanWood, cx + 0.48, 0.91, front);
+    C.pb(1.16, 0.11, 0.62, mats.butsudanWood, cx, 1.57, z1 + 0.34);
+    C.pb(1.04, 0.1, 0.68, mats.butsudanWood, cx, 1.67, z1 + 0.36);
     C.blk(x0 + 0.25, z1, x0 + 1.35, z1 + 0.65);
-    const inner = C.wall(0.72, 0.95, mats.gold, x0 + 0.8, 1.02, z1 + 0.63);
+    const inner = C.wall(0.78, 1.18, mats.butsudanGold, cx, 0.98, front + 0.006);
     inner.rotation.y = 0;
-    // 位牌
-    for (let i = 0; i < 5; i++) {
-      C.pb(0.07, 0.24, 0.05, mats.darkwood, x0 + 0.48 + i * 0.16, 0.72, z1 + 0.6);
+
+    // 彫刻扉は左右へ開いた状態にし、正面を塞がずに仏壇らしい厚みを見せる。
+    C.pb(0.34, 1.2, 0.055, mats.butsudanDoor, cx - 0.68, 0.94, front + 0.08, -0.2);
+    C.pb(0.34, 1.2, 0.055, mats.butsudanDoor, cx + 0.68, 0.94, front + 0.08, 0.2);
+
+    // 内陣の屋根と三段棚を別部品にし、金箔の平面だけに見えない奥行きを作る。
+    C.pb(0.7, 0.08, 0.13, mats.butsudanGold, cx, 1.42, front + 0.075);
+    C.pb(0.58, 0.07, 0.11, mats.butsudanGold, cx, 1.34, front + 0.09);
+    C.pb(0.08, 0.54, 0.08, mats.butsudanGold, cx - 0.29, 1.09, front + 0.1);
+    C.pb(0.08, 0.54, 0.08, mats.butsudanGold, cx + 0.29, 1.09, front + 0.1);
+    for (const [y, w, d] of [[0.78, 0.8, 0.2], [0.58, 0.88, 0.24], [0.38, 0.94, 0.28]]) {
+      C.pb(w, 0.055, d, mats.altarCloth, cx, y, front + d / 2);
     }
-    // 遺影
-    C.wall(0.5, 0.62, mats.portrait, x0 + 0.8, 1.86, z1 + 0.05);
+
+    // 位牌は台座・札・丸い頂部を分け、前後二列で「数が多すぎる」部屋の設定を形にする。
+    const ihai = (px, y, pz, s) => {
+      C.pb(0.13 * s, 0.045, 0.07, mats.ihai, px, y, pz);
+      C.pb(0.085 * s, 0.2 * s, 0.045, mats.ihai, px, y + 0.12 * s, pz);
+      const top = new THREE.Mesh(new THREE.SphereGeometry(0.052 * s, 8, 6), mats.ihai);
+      top.scale.y = 1.25; top.position.set(px, y + 0.23 * s, pz); C.g.add(top);
+    };
+    for (let i = 0; i < 5; i++) ihai(cx - 0.3 + i * 0.15, 0.8, front + 0.13, 0.88);
+    for (let i = 0; i < 4; i++) ihai(cx - 0.225 + i * 0.15, 0.59, front + 0.18, 0.72);
+
+    // 吊灯籠は金属の笠と乳白色の灯りを分け、暗い部屋でも左右対称の祭壇だと分かるようにする。
+    for (const sx of [-1, 1]) {
+      const px = cx + sx * 0.34;
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.24, 6), mats.darksteel);
+      cord.position.set(px, 1.28, front + 0.16); C.g.add(cord);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), mats.altarLamp);
+      lamp.scale.y = 1.25; lamp.position.set(px, 1.13, front + 0.16); C.g.add(lamp);
+      const shade = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.08, 10), mats.butsudanGold);
+      shade.position.set(px, 1.22, front + 0.16); C.g.add(shade);
+    }
+
+    // 香炉・ろうそく・供物まで置き、調べたときの「まだ温かい灰」が目で確かめられるようにする。
+    const burner = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.1, 12), mats.butsudanGold);
+    burner.position.set(cx, 0.47, front + 0.28); C.g.add(burner);
+    for (const sx of [-1, 1]) {
+      const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.025, 0.18, 8), mats.candleWax);
+      candle.position.set(cx + sx * 0.26, 0.53, front + 0.27); C.g.add(candle);
+      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.07, 8), mats.candleFlame);
+      flame.position.set(cx + sx * 0.26, 0.655, front + 0.27); C.g.add(flame);
+    }
+    for (let i = 0; i < 3; i++) {
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.22 - i * 0.035, 5), mats.incense);
+      stick.position.set(cx - 0.025 + i * 0.025, 0.59 - i * 0.017, front + 0.28); C.g.add(stick);
+    }
+    for (const sx of [-1, 1]) {
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.055, 0.065, 12), mats.porcelain);
+      bowl.position.set(cx + sx * 0.15, 0.835, front + 0.24); C.g.add(bowl);
+    }
+
+    // 上部の欄間と遺影を額縁で囲み、仏壇の上だけが空白になる不自然さをなくす。
+    C.wall(1.18, 0.36, mats.butsudanDoor, cx, 2.06, z1 + 0.035);
+    for (const sx of [-1, 1]) {
+      // 添付写真の房飾りを立体化し、暗い中でも欄間から祭壇まで視線が縦につながるようにする。
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.25, 6), mats.darkwood);
+      cord.position.set(cx + sx * 0.4, 2.05, z1 + 0.14); C.g.add(cord);
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.16, 10), mats.darkwood);
+      tassel.rotation.x = Math.PI; tassel.position.set(cx + sx * 0.4, 1.86, z1 + 0.14); C.g.add(tassel);
+    }
+    C.pb(0.48, 0.6, 0.045, mats.frame, cx, 1.9, z1 + 0.09);
+    C.wall(0.4, 0.51, mats.portrait, cx, 1.9, z1 + 0.12);
     // 座布団
     C.pb(0.6, 0.09, 0.6, mats.cushion, x0 + 0.8, 0.05, z1 + 1.3);
     C.pb(0.6, 0.09, 0.6, mats.cushion, x0 + 1.6, 0.05, z1 + 1.3);
@@ -1065,6 +1140,15 @@ export function buildFloor(scene, floorDef, opt) {
     bare_floor: lam({ map: TX.floorStair(2, 2), color: 0x8a8a86 }),
     darkwood: lam({ map: interiorTexture(2, 0), color: 0x776655 }),
     gold: lam({ color: 0x6b5a2a }),
+    butsudanWood: lam({ map: butsudanTexture(0, 0), color: 0x756353 }),
+    butsudanGold: lam({ map: butsudanTexture(1, 0), color: 0x806c42 }),
+    butsudanDoor: lam({ map: butsudanTexture(0, 0), color: 0x695749 }),
+    ihai: lam({ map: butsudanTexture(0, 1), color: 0x82715b }),
+    altarCloth: lam({ map: butsudanTexture(1, 1), color: 0x7c6258 }),
+    altarLamp: new THREE.MeshBasicMaterial({ color: 0xb09a67 }),
+    candleWax: lam({ color: 0xc8b895 }),
+    candleFlame: new THREE.MeshBasicMaterial({ color: 0xb56d30 }),
+    incense: lam({ color: 0x2d1b15 }),
     portrait: lam({ map: TX.portrait() }),
     cushion: lam({ color: 0x5a3f42 }),
     cardboard: lam({ map: interiorTexture(1, 1), color: 0xb39a78 }),
