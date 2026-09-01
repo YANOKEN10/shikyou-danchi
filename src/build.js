@@ -63,6 +63,7 @@ const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-
 const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v1.png?v=20260831");
 // 四分割素材では鏡の中で顔が小さく潰れたため、鏡だけは縦長の専用画像を原寸で使う。
 const generatedMirrorGhost = generatedTexture("./assets/generated/mirror-ghost-v2.png?v=20260901");
+const roomSurfacesAtlas = generatedTexture("./assets/generated/room-surfaces-atlas-v1.png?v=20260901");
 
 // 一枚の生成画像を六つの素材へ切り分け、通信量を増やさず家具ごとの質感を変える。
 function interiorTexture(col, row) {
@@ -77,6 +78,15 @@ function interiorTexture(col, row) {
 // 水回り専用の四区画素材。共通画像から切り出して床・戸・照明の年代感を揃える。
 function wetAreaTexture(col, row) {
   const tex = wetAreaAtlas.clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1 / 2, 1 / 2);
+  tex.offset.set(col / 2, row === 0 ? 1 / 2 : 0);
+  return tex;
+}
+
+// 台所床・水回り壁・トイレ床・浴室床を別面として切り出し、同じ模様が壁から床へ続く不自然さを防ぐ。
+function roomSurfaceTexture(col, row) {
+  const tex = roomSurfacesAtlas.clone();
   tex.needsUpdate = true;
   tex.repeat.set(1 / 2, 1 / 2);
   tex.offset.set(col / 2, row === 0 ? 1 / 2 : 0);
@@ -154,7 +164,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   const zMid = z0 - 3.1;
 
   /* --- 床・天井・壁 --- */
-  const f1 = plane(D.UNIT_W, z0 - zMid, mats.tile);      // 手前は台所の床
+  const f1 = plane(D.UNIT_W, z0 - zMid, mats.entryFloor);      // 手前は台所の床
   f1.rotation.x = -Math.PI / 2;
   put(g, f1, dx, 0.01, (z0 + zMid) / 2);
   const f2 = plane(D.UNIT_W, zMid - z1, unitMaterials(mats, room));
@@ -362,14 +372,14 @@ function commonWetArea(C) {
   // 同じ新品タイルを敷き通すと間取りが読めないため、トイレと浴室で汚れ方と目地を変える。
   C.pb(right - left, 0.06, front - split, mats.wetToiletFloor, (left + right) / 2, 0.035, (front + split) / 2);
   C.pb(right - left, 0.06, split - back, mats.wetBathFloor, (left + right) / 2, 0.035, (split + back) / 2);
-  C.pb(right - left, H, 0.08, mats.tile, (left + right) / 2, H / 2, split);
+  C.pb(right - left, H, 0.08, mats.wetWall, (left + right) / 2, H / 2, split);
   C.blk(left, split - 0.04, right, split + 0.04);
 
   // 廊下側の壁は戸口だけ切り欠く。戸を開けたときだけ当たり判定も外す。
   const makeFront = (za, zb, name) => {
     const gap0 = za + 0.28, gap1 = gap0 + doorW;
-    C.pb(0.08, H, gap0 - za, mats.tile, right, H / 2, (za + gap0) / 2);
-    C.pb(0.08, H, zb - gap1, mats.tile, right, H / 2, (gap1 + zb) / 2);
+    C.pb(0.08, H, gap0 - za, mats.wetWall, right, H / 2, (za + gap0) / 2);
+    C.pb(0.08, H, zb - gap1, mats.wetWall, right, H / 2, (gap1 + zb) / 2);
     C.blk(right - 0.04, za, right + 0.04, gap0);
     C.blk(right - 0.04, gap1, right + 0.04, zb);
     const dc = C.col.add(right - 0.05, gap0, right + 0.05, gap1, "fixtureDoor");
@@ -414,6 +424,8 @@ function commonWetArea(C) {
   C.g.add(hair);
 
   // 右壁を共通の台所にし、部屋の種類にかかわらず流しと冷蔵庫を持たせる。
+  // 冷蔵庫と流しの背面だけを古いタイルにし、居室の壁紙へ水汚れが唐突に続かないよう区切る。
+  C.wall(2.72, 1.82, mats.kitchenWall, x1 - 0.025, 1.03, z0 - 1.5, -Math.PI / 2);
   C.pb(1.45, 0.82, 0.48, mats.kitchenSteel, x1 - 0.86, 0.41, z0 - 1.03);
   C.blk(x1 - 1.62, z0 - 1.31, x1 - 0.1, z0 - 0.75);
   const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.035, 16), mats.darksteel);
@@ -1074,8 +1086,11 @@ export function buildFloor(scene, floorDef, opt) {
     curtain: lam({ color: 0x6e6656 }),
     newspaper: lam({ color: 0xbdb49c }),
     frostglass: lam({ color: 0x8f9aa0 }),
-    wetBathFloor: lam({ map: wetAreaTexture(0, 0), color: 0xa8a49a }),
-    wetToiletFloor: lam({ map: wetAreaTexture(1, 0), color: 0xa59a80 }),
+    entryFloor: lam({ map: roomSurfaceTexture(0, 0), color: 0xaaa18b }),
+    wetWall: lam({ map: roomSurfaceTexture(1, 0), color: 0x9d998c }),
+    kitchenWall: lam({ map: roomSurfaceTexture(1, 0), color: 0x8f8978 }),
+    wetToiletFloor: lam({ map: roomSurfaceTexture(0, 1), color: 0x928575 }),
+    wetBathFloor: lam({ map: roomSurfaceTexture(1, 1), color: 0x77888a }),
     wetDoor: lam({ map: wetAreaTexture(0, 1), color: 0xb0b3ad, transparent: true, opacity: 0.88 }),
     roomLight: new THREE.MeshBasicMaterial({ map: wetAreaTexture(1, 1), color: 0xc1b798 }),
     rustedSteel: lam({ color: 0x4d4b46 }),
