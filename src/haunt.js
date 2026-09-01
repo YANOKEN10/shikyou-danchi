@@ -12,6 +12,8 @@ import { D } from "./build.js";
 const apparitionAtlas = new THREE.TextureLoader().load("./assets/generated/ghost-phenomena-atlas-v1.png?v=20260831");
 apparitionAtlas.colorSpace = THREE.SRGBColorSpace;
 apparitionAtlas.wrapS = apparitionAtlas.wrapT = THREE.RepeatWrapping;
+const mirrorApparition = new THREE.TextureLoader().load("./assets/generated/mirror-ghost-v2.png?v=20260901");
+mirrorApparition.colorSpace = THREE.SRGBColorSpace;
 function apparitionTexture(col, row) {
   const tex = apparitionAtlas.clone();
   tex.needsUpdate = true;
@@ -21,7 +23,7 @@ function apparitionTexture(col, row) {
   return tex;
 }
 const APPARITION_MAPS = {
-  mirror: apparitionTexture(0, 0), toilet: apparitionTexture(1, 0),
+  mirror: mirrorApparition, toilet: apparitionTexture(1, 0),
   hands: apparitionTexture(0, 1), window: apparitionTexture(1, 1),
 };
 

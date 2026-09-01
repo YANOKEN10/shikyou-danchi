@@ -650,7 +650,8 @@ export class Game {
         if (f.ph != null && f.ph > 0) {
           f.ph += dt / 1.6;
           const k = Math.min(1, f.ph);
-          f.mesh.material.opacity = Math.sin(Math.PI * k) * 0.66;
+          // 専用画像の目と口が曇りに負けない濃さまで出し、見間違いでは済まない一瞬にする。
+          f.mesh.material.opacity = Math.sin(Math.PI * k) * 0.9;
           if (f.ph >= 1) { f.ph = 0; f.mesh.material.opacity = 0; }
         } else if (dist < 5 && facing > 0.55 && this.player.inUnit) {
           f.t -= dt;
@@ -843,7 +844,17 @@ export class Game {
         return;
       }
       // 中身は、開けたときにはじめて組み立てます
-      if (!d.built && d.build) d.build();
+      if (!d.built && d.build) {
+        const firstNew = this.floor.inter.length;
+        d.build();
+        // 住戸は扉を開けた時に生成されるため、保存済みの持ち物は生成直後に隠さないと再び置かれて見える。
+        this.floor.inter.slice(firstNew).forEach((entry) => {
+          if (entry.kind === "item" && this.state.items[entry.id]) {
+            entry.done = true;
+            if (entry.prop) entry.prop.visible = false;
+          }
+        });
+      }
 
       d.open = !d.open;
       if (d.open) {
@@ -938,6 +949,8 @@ export class Game {
       }
       this.state.spare = p.spare;
       this.snd.pickup();
+      // 説明文だけでは取得できたか分かりにくいため、品名と完了を最初にはっきり表示する。
+      this.ui.sayNow((info ? info.name : "品物") + "を取りました。");
       if (it.note) this.ui.say(it.note);
       if (info) this.ui.say(info.say);
       this.save(true);

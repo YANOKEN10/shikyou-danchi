@@ -6,7 +6,7 @@
 // ============================================================
 import * as THREE from "../lib/three.module.js";
 import * as TX from "./textures.js";
-import { ROOMS } from "./story.js";
+import { ROOMS, ITEMS } from "./story.js";
 
 export const D = {
   CEIL: 2.42,        // 廊下の天井
@@ -61,6 +61,8 @@ const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 
 const generatedEntity = generatedTexture("./assets/generated/entity-photoreal.webp?v=20260830-2");
 const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-v2.png?v=20260830");
 const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v1.png?v=20260831");
+// 四分割素材では鏡の中で顔が小さく潰れたため、鏡だけは縦長の専用画像を原寸で使う。
+const generatedMirrorGhost = generatedTexture("./assets/generated/mirror-ghost-v2.png?v=20260901");
 
 // 一枚の生成画像を六つの素材へ切り分け、通信量を増やさず家具ごとの質感を変える。
 function interiorTexture(col, row) {
@@ -252,7 +254,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
     const prop = buildItemProp(C, unit.item, at[0], at[1]);
     inter.push({
       x: at[0], y: prop.userData.interactY || 0.8, z: at[1], r: 1.35,
-      kind: "item", id: unit.item, label: "手に取る", once: true, note: unit.note, prop,
+      kind: "item", id: unit.item, label: (ITEMS[unit.item] ? ITEMS[unit.item].name : "品物") + "を取る", once: true, note: unit.note, prop,
     });
   }
   if (unit.memo && !unit.goal) {
@@ -469,21 +471,28 @@ function buildFridge(C, px, pz) {
 function buildItemProp(C, id, px, pz) {
   const g = new THREE.Group();
   if (id === "light") {
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.24, 12), C.mats.darksteel);
+    // 暗い靴箱の上でも輪郭が沈まないよう、実寸より少し大きくし銀色の節を足す。
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.34, 16), C.mats.darksteel);
     body.rotation.x = Math.PI / 2; g.add(body);
-    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.055, 0.07, 12), C.mats.steel);
-    lens.rotation.x = Math.PI / 2; lens.position.z = -0.15; g.add(lens);
-    const glass = new THREE.Mesh(new THREE.CircleGeometry(0.07, 12), C.mats.lens);
-    glass.position.z = -0.187; glass.rotation.y = Math.PI; g.add(glass);
-    const sw = box(0.04, 0.025, 0.06, C.mats.switchMat); sw.position.set(0, 0.065, -0.01); g.add(sw);
-    g.position.set(px, 0.82, pz); g.userData.interactY = 0.82;
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.07, 0.09, 16), C.mats.steel);
+    lens.rotation.x = Math.PI / 2; lens.position.z = -0.21; g.add(lens);
+    const glass = new THREE.Mesh(new THREE.CircleGeometry(0.095, 16), C.mats.lens);
+    glass.position.z = -0.258; glass.rotation.y = Math.PI; g.add(glass);
+    for (let i = 0; i < 4; i++) {
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.009, 5, 16), C.mats.steel);
+      rib.position.z = -0.07 + i * 0.055; g.add(rib);
+    }
+    const sw = box(0.055, 0.035, 0.075, C.mats.switchMat); sw.position.set(0, 0.085, -0.02); g.add(sw);
+    g.position.set(px, 0.86, pz); g.rotation.y = -0.22; g.userData.interactY = 0.86;
   } else if (id.indexOf("key") === 0) {
-    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.018, 6, 16), C.mats.key);
+    // 鍵穴ほどの大きさでは床や壁の汚れに紛れるため、赤い札を含めて一目で鍵と読める縮尺にする。
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.026, 8, 20), C.mats.key);
     bow.rotation.x = Math.PI / 2; bow.position.x = -0.11; g.add(bow);
-    const shaft = box(0.22, 0.025, 0.045, C.mats.key); shaft.position.x = 0.035; g.add(shaft);
-    const tooth = box(0.055, 0.06, 0.045, C.mats.key); tooth.position.set(0.13, -0.025, 0); g.add(tooth);
-    const tag = box(0.13, 0.025, 0.09, C.mats.keyTag); tag.position.x = -0.22; g.add(tag);
-    g.position.set(px, 0.92, pz); g.rotation.z = -0.18; g.userData.interactY = 0.92;
+    const shaft = box(0.3, 0.035, 0.06, C.mats.key); shaft.position.x = 0.08; g.add(shaft);
+    const toothA = box(0.075, 0.09, 0.06, C.mats.key); toothA.position.set(0.2, -0.035, 0); g.add(toothA);
+    const toothB = box(0.06, 0.065, 0.06, C.mats.key); toothB.position.set(0.27, -0.025, 0); g.add(toothB);
+    const tag = box(0.2, 0.035, 0.14, C.mats.keyTag); tag.position.x = -0.29; g.add(tag);
+    g.position.set(px, 0.94, pz); g.rotation.set(0.18, -0.2, -0.18); g.userData.interactY = 0.94;
   } else {
     const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.18, 10), C.mats.darksteel);
     cell.rotation.z = Math.PI / 2; g.add(cell); g.position.set(px, 0.78, pz); g.userData.interactY = 0.78;
@@ -1088,7 +1097,7 @@ export function buildFloor(scene, floorDef, opt) {
     futon: lam({ color: 0xa8a196 }),
     futon2: lam({ color: 0x7d7a72 }),
     pillow: lam({ color: 0xbdb6a8 }),
-    ghost: new THREE.MeshBasicMaterial({ map: TX.figure(), transparent: true, opacity: 0, depthWrite: false }),
+    ghost: new THREE.MeshBasicMaterial({ map: generatedMirrorGhost, transparent: true, opacity: 0, depthWrite: false }),
   };
 
   /* --- 廊下の床・天井 --- */
