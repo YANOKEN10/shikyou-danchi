@@ -428,12 +428,12 @@ function addWetMirror(C, px, py, pz, ry, w, h, label) {
   const frame = box(0.055, h + 0.1, w + 0.1, C.mats.rustedSteel);
   frame.position.set(px, py, pz); C.g.add(frame);
   const mirror = C.wall(w, h, C.mats.mirror, px + 0.035, py, pz, ry);
-  const smear = C.wall(w * 0.92, h * 0.92, C.mats.mirrorSmear, px + 0.044, py, pz, ry);
+  // 指形の曇りは小さな鏡では記号のように見えたため、腐食した鏡面だけを残して自然な汚れにする。
   // 鏡像の人影を鏡面よりわずかに手前へ置き、ちらつき時のZファイティングを避ける。
   addGhost(C, mirror, px + 0.052, py - 0.05, pz, ry, w * 0.68, h * 0.82);
   C.inter.push({ x: px + 0.42, y: py, z: pz, r: 0.95, kind: "detail", label,
     say: "曇った鏡に、自分ではない息の跡が増えている。", scare: "mirror", once: true });
-  return { mirror, smear };
+  return { mirror };
 }
 
 function buildFridge(C, px, pz) {
