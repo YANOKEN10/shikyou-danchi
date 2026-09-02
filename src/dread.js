@@ -116,7 +116,7 @@ export class DreadDirector {
         // 鏡の座標から立体の幽霊を出し、高速で顔面距離まで詰めて「画像の拡大」ではない動きにする。
         if (g._showApparition(f.x, f.z, 2.4,
           { mode: "approach", speed: 8.5, stopDistance: 0.18, scale: 1.55, pose: "lean" })) {
-          g.snd.stinger(); g.ui.hit();
+          g.snd.stinger("close"); g.ui.hit();
         }
       }
     }, end: () => { f.mesh.material.opacity = 0; f.mesh.scale.setScalar(1); } });
@@ -197,7 +197,7 @@ export class DreadDirector {
   // 捕獲直前の消失後は鏡を一度だけ光らせ、単なる処理落ちに見せない。
   nearMiss() {
     const g = this.g;
-    g.snd.stinger(); g.ui.hit();
+    g.snd.stinger("close"); g.ui.hit();
     setTimeout(() => g.snd.sample("distant-laugh", { vol: 0.25, pan: rnd(-0.9, 0.9), wet: 0.65 }), 900);
     const f = g.floor.fx.find((x) => x.kind === "mirror");
     if (f) { f.ph = 0.0001; f.t = 20; }

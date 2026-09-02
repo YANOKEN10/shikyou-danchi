@@ -272,7 +272,7 @@ export class Haunts {
     mesh.lookAt(g.camera.position.x, mesh.position.y, g.camera.position.z);
     mesh.renderOrder = 30;
     g.floor.group.add(mesh);
-    g.snd.stinger(); g.ui.hit();
+    g.snd.stinger("close"); g.ui.hit();
     this._add({
       kind: "cameraVisitor", life: 1.55,
       step: (e) => {

@@ -434,7 +434,7 @@ export class Versus {
     if (o.e === "caught") {
       const p = this.players.get(o.s);
       if (p) { p.st = ST.HELD; p.lives = o.lives; }
-      g.snd.stinger();
+      g.snd.stinger("caught");
       g.ui.hit();
       g.ui.sayNow(o.s === this.me ? "つかまった。仲間が来るまで動けない。" : name(o.s) + " がつかまった。");
     } else if (o.e === "rescued" || o.e === "escaped_hold") {

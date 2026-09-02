@@ -226,6 +226,12 @@ export class Stalker {
       const near = Math.max(0, 1 - dist / 14);
       out.tension = Math.max(out.tension || 0, this.state === "hunt" ? Math.max(0.55, near) : near * 0.7 + this.awareness * 0.3);
       out.veryNear = Math.max(out.veryNear || 0, this.state === "hunt" && dist < 3.5 ? 1 : 0);
+      // 音を画面上の敵位置へ寄せるため、最も近い個体の距離と左右を音響側へ渡す。
+      if (dist < (out.nearestDistance == null ? Infinity : out.nearestDistance)) {
+        out.nearestDistance = dist;
+        out.nearPan = Math.max(-1, Math.min(1, (this.x - player.pos.x) / 5));
+      }
+      if (this.state === "hunt") out.hunting = true;
     }
   }
 }
@@ -257,7 +263,8 @@ export class Stalkers {
   get active() { return this.list.length > 0; }
 
   update(dt, player, col, snd) {
-    const out = { tension: 0, veryNear: 0, caught: false, spotted: false, stare: false, nearMiss: false };
+    const out = { tension: 0, veryNear: 0, caught: false, spotted: false, stare: false, nearMiss: false,
+      hunting: false, nearestDistance: Infinity, nearPan: 0 };
     this.list.forEach((s) => s.update(dt, player, col, snd, out));
     return out;
   }

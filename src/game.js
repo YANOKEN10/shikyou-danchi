@@ -446,23 +446,30 @@ export class Game {
     }
 
     // 追跡者
-    let out = { tension: 0, veryNear: 0, caught: false, spotted: false };
+    let out = { tension: 0, veryNear: 0, caught: false, spotted: false,
+      hunting: false, nearestDistance: Infinity, nearPan: 0 };
     if (this.stalkers.active) out = this.stalkers.update(dt, p, f.col, this.snd);
     this.appar.update(dt, p);
     this.dread.update(dt, out);
 
     if (out.spotted && !this._spotFlag) {
       this._spotFlag = true;
-      this.snd.stinger();
+      this.snd.stinger("spotted");
       this.ui.sayNow(S.CHASE_LINES[Math.floor(Math.random() * S.CHASE_LINES.length)]);
       this.ui.hit();
     }
     if (!out.spotted && this._spotFlag && out.tension < 0.3) this._spotFlag = false;
 
     const tension = Math.min(1, out.tension + (this.state.flags.chase ? 0.35 : 0));
-    this.snd.setTension(tension);
+    // 平常・警戒・追跡・目前を音響側で分け、無関係な環境音が恐怖場面へ重ならないようにする。
+    this.snd.setThreat(tension, {
+      hunting: Boolean(out.hunting || this.state.flags.chase),
+      near: out.veryNear > 0.5,
+      pan: out.nearPan || 0,
+      closeApparition: this.appar.mesh.visible && this.appar.stopDistance <= 0.25,
+      indoors: p.inUnit,
+    });
     this.ui.setTension(tension);
-    if (out.veryNear > 0.5) this.snd.breathOn(); else this.snd.breathOff();
 
     if (out.caught) { this._caught(); return; }
 
@@ -591,11 +598,12 @@ export class Game {
     }
     // まず、触ったものの音
     const kind = this.curRoom && this.curRoom.room ? this.curRoom.room.kind : "";
-    if (kind === "boxes" || kind === "storage" || kind === "office" || kind === "child") this.snd.drawer();
-    else if (kind === "trash") this.snd.rustle();
+    if (kind === "boxes" || kind === "storage" || kind === "office" || kind === "child" || kind === "kitchen") this.snd.drawer();
+    else if (kind === "trash" || kind === "futon") this.snd.rustle();
     else if (kind === "bath") this.snd.drip();
     else if (kind === "mirrors") this.snd.mirrorRing();
-    else this.snd.paper();
+    else if (kind === "letter") this.snd.paper();
+    else this.snd.woodTouch();
 
     const s = it.scare;
     if (!s) return;
@@ -752,7 +760,7 @@ export class Game {
       // 振り向きざまは顔が画面を覆う距離へ置き、遠くから歩いてくる演出との差をはっきりさせる。
       if (this._showApparition(x, z, 4.2,
         { mode: "approach", speed: 0.16, stopDistance: 0.18, scale: 1.55, pose: "lean" })) {
-        this.snd.stinger(); this.ui.hit();
+        this.snd.stinger("close"); this.ui.hit();
         this.apparCooldown = 28 + Math.random() * 24;
       }
       this.turnLook = 0;
@@ -771,7 +779,7 @@ export class Game {
             // 短い飛び出しは添付参考のように背景がほぼ消える距離で顔を見せる。
             shown = this._showApparition(p.x + f.x * 0.24, p.z + f.z * 0.24, 1.45,
               { mode: "approach", speed: 0.9, stopDistance: 0.18, scale: 1.55, pose: "lean" });
-            if (shown) { this.snd.stinger(); this.ui.hit(); }
+            if (shown) { this.snd.stinger("close"); this.ui.hit(); }
           } else if (roll < 0.72) {
             const x = Math.max(0.9, Math.min(this.floor.len - 0.9, p.x + f.x * 3.8));
             shown = this._showApparition(x, p.z + f.z * 3.2, 4.8, { mode: "approach", speed: 0.38 });
@@ -1066,7 +1074,7 @@ export class Game {
 
   _startChase() {
     this.state.flags.chase = true;
-    this.snd.stinger();
+    this.snd.stinger("chase");
     this.floor.lights.forEach((L) => { L.light.intensity = 0; L.dead = true; L.flicker = false; L.tube.material.color.setHex(0x121512); });
     this.snd.buzzOff();
     this.ui.sayNow("——廊下の灯りが、いっせいに落ちた。");
@@ -1093,7 +1101,7 @@ export class Game {
     if (this._ending) return;
     this._ending = true;
     this.running = false;
-    this.snd.stinger();
+    this.snd.stinger("caught");
     this.ui.hit();
     this.snd.allOff();
     this.player.unlock();

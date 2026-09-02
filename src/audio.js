@@ -33,6 +33,8 @@ export class Sound {
     this._buzz = null;
     this._heart = null;
     this._breath = null;
+    this._danger = null;
+    this._threatMode = "calm";
     this.samples = new Map();
     this._sampleLoading = false;
   }
@@ -501,6 +503,12 @@ export class Sound {
     this.burst({ freq: 2500, q: 7, vol: 0.05, dur: 0.6, atk: 0.25, wet: 1.4 });
   }
 
+  // 仏壇や机などの古い木部。紙の音を流用すると触った物と一致しないため、鈍い木の反響にする。
+  woodTouch() {
+    this.burst({ freq: rnd(170, 260), q: 1.4, vol: 0.16, dur: 0.08, wet: 0.55 });
+    setTimeout(() => this.burst({ freq: rnd(520, 760), q: 3.2, vol: 0.07, dur: 0.05, wet: 0.45 }), 45);
+  }
+
   // 押し入れ・引き出し
   drawer() {
     if (!this.ready || this.muted) return;
@@ -583,20 +591,25 @@ export class Sound {
 
   /* ---------- 驚かす音 ---------- */
 
-  stinger() {
+  stinger(kind) {
     if (!this.ready || this.muted) return;
     const ctx = this.ctx, t = this.t;
 
-    // 弦を擦るような不協和音
+    // 目前・追跡開始・捕獲で音色を分け、どの恐怖でも同じ映画的な効果音にならないようにする。
+    const close = kind === "close", chase = kind === "chase", caught = kind === "caught";
+    if (close) {
+      this.sample("joint-cracks", { vol: 0.42, pan: rnd(-0.18, 0.18), wet: 0.16, rate: 0.84 });
+      this.sample("wet-breath", { vol: 0.5, pan: rnd(-0.12, 0.12), wet: 0.2, rate: 0.92 });
+    }
     [0, 1, 2].forEach((i) => {
       const osc = ctx.createOscillator();
       osc.type = "sawtooth";
-      const base = [880, 932, 1245][i];
+      const base = close ? [410, 437, 622][i] : chase ? [690, 733, 978][i] : caught ? [190, 207, 286][i] : [880, 932, 1245][i];
       osc.frequency.setValueAtTime(base * rnd(0.98, 1.02), t);
       osc.frequency.exponentialRampToValueAtTime(base * 0.35, t + 1.1);
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.095, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(close ? 0.065 : caught ? 0.14 : 0.095, t + 0.012);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
       const f = ctx.createBiquadFilter();
       f.type = "lowpass"; f.frequency.value = 5200;
@@ -605,8 +618,8 @@ export class Sound {
       osc.start(t); osc.stop(t + 1.25);
     });
 
-    this.burst({ freq: 200, q: 0.4, vol: 0.22, dur: 0.5, wet: 1.4 });
-    this.tone({ type: "sine", f0: 55, f1: 28, vol: 0.30, dur: 1.4, wet: 1.0 });
+    this.burst({ freq: close ? 105 : caught ? 72 : 200, q: 0.4, vol: caught ? 0.38 : 0.22, dur: close ? 0.28 : 0.5, wet: close ? 0.35 : 1.4 });
+    this.tone({ type: "sine", f0: caught ? 38 : chase ? 49 : 55, f1: caught ? 17 : 28, vol: close ? 0.2 : 0.30, dur: close ? 0.65 : 1.4, wet: close ? 0.35 : 1.0 });
   }
 
   whisper() {
@@ -736,7 +749,7 @@ export class Sound {
   // 蛍光灯のうなり
   buzzOn(level) {
     if (!this.ready) return;
-    if (this._buzz) { this._buzz.g.gain.setTargetAtTime(level == null ? 0.03 : level, this.t, 0.2); return; }
+    if (this._buzz) { this._buzz.level = level == null ? 0.03 : level; this._buzz.g.gain.setTargetAtTime(this._buzz.level, this.t, 0.2); return; }
     const ctx = this.ctx;
     const osc = ctx.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = 100;
     const osc2 = ctx.createOscillator(); osc2.type = "square"; osc2.frequency.value = 300;
@@ -745,7 +758,7 @@ export class Sound {
     osc.connect(f); osc2.connect(f); f.connect(g); g.connect(this.master);
     osc.start(); osc2.start();
     g.gain.setTargetAtTime(level == null ? 0.03 : level, this.t, 0.5);
-    this._buzz = { osc, osc2, g };
+    this._buzz = { osc, osc2, g, level: level == null ? 0.03 : level };
   }
 
   buzzOff() {
@@ -763,6 +776,56 @@ export class Sound {
     if (this.tension <= 0.12 && this._heart) this._stopHeart();
   }
 
+  // 距離だけで心音を鳴らすと、まだ安全な巡回中まで追跡音楽になる。
+  // 発見・目前・室内をまとめて受け取り、同じ場所でも状況に合う音層だけを残す。
+  setThreat(x, opt) {
+    const o = opt || {};
+    const close = Boolean(o.near || o.closeApparition);
+    this.tension = close ? Math.max(0.86, clamp(x, 0, 1)) : clamp(x, 0, 1);
+    if (!this.ready) return;
+    const hunting = Boolean(o.hunting);
+    this._threatMode = close ? "close" : hunting ? "hunt" : this.tension > 0.34 ? "uneasy" : "calm";
+    if ((hunting || close) && this.tension > 0.4 && !this._heart) this._startHeart();
+    if ((!hunting && !close) || this.tension <= 0.28) this._stopHeart();
+    if (close) this.breathOn(o.pan || 0); else this.breathOff();
+    if (hunting || close) this._dangerOn(close ? 1 : Math.max(0.45, this.tension));
+    else this._dangerOff();
+    // 敵が近いときは風・室内低音・蛍光灯を引かせ、居場所を示す呼吸と追跡音を聞き取れるようにする。
+    const duck = close ? 0.16 : hunting ? 0.34 : 1;
+    if (this._amb) this._amb.g.gain.setTargetAtTime(0.09 * duck, this.t, 0.18);
+    if (this._room) this._room.g.gain.setTargetAtTime(0.075 * duck, this.t, 0.18);
+    if (this._buzz) this._buzz.g.gain.setTargetAtTime(close ? 0.004 : hunting ? 0.01 : this._buzz.level, this.t, 0.15);
+  }
+
+  // 追跡時だけ鳴る低い圧迫音。旋律ではなく、速度を急かす不規則な脈動にする。
+  _dangerOn(level) {
+    if (!this.ready) return;
+    if (this._danger) {
+      this._danger.g.gain.setTargetAtTime(0.035 + level * 0.075, this.t, 0.12);
+      this._danger.lfoGain.gain.setTargetAtTime(0.018 + level * 0.035, this.t, 0.12);
+      return;
+    }
+    const ctx = this.ctx;
+    const a = ctx.createOscillator(); a.type = "sine"; a.frequency.value = 31;
+    const b = ctx.createOscillator(); b.type = "triangle"; b.frequency.value = 46.7;
+    const src = this._src(true);
+    const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 145;
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+    const lfo = ctx.createOscillator(); lfo.type = "sawtooth"; lfo.frequency.value = 1.35;
+    const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.02;
+    a.connect(g); b.connect(g); src.connect(filter); filter.connect(g);
+    lfo.connect(lfoGain); lfoGain.connect(g.gain); g.connect(this.master);
+    a.start(); b.start(); src.start(); lfo.start();
+    g.gain.setTargetAtTime(0.035 + level * 0.075, this.t, 0.12);
+    this._danger = { a, b, src, lfo, lfoGain, g };
+  }
+
+  _dangerOff() {
+    if (!this._danger) return;
+    const d = this._danger; this._danger = null;
+    d.g.gain.setTargetAtTime(0.0001, this.t, 0.22);
+    setTimeout(() => { try { d.a.stop(); d.b.stop(); d.src.stop(); d.lfo.stop(); } catch (e) {} }, 900);
+  }
   _startHeart() {
     const self = this;
     let alive = true;
@@ -786,16 +849,20 @@ export class Sound {
   }
 
   // すぐ後ろにいるときの息づかい
-  breathOn() {
-    if (!this.ready || this._breath) return;
+  breathOn(pan) {
+    if (!this.ready) return;
+    if (this._breath) { this._breath.pan = clamp(pan || 0, -1, 1); return; }
     const self = this;
     let alive = true;
     const cycle = () => {
       if (!alive || !self._breath) return;
-      self.burst({ freq: rnd(500, 800), q: 1.2, vol: 0.09, dur: 0.45, atk: 0.18, wet: 0.8, rate: 0.6 });
-      self._breath.timer = setTimeout(cycle, rnd(1100, 1700));
+      // 目前では生成ノイズより濡れた実録素材を優先し、左右位置も敵の側へ固定する。
+      if (!self.sample("wet-breath", { vol: 0.52, pan: self._breath.pan, wet: 0.22, rate: rnd(0.9, 1.04) })) {
+        self.burst({ freq: rnd(430, 680), q: 0.8, vol: 0.14, dur: 0.58, atk: 0.2, wet: 0.45, rate: 0.52 });
+      }
+      self._breath.timer = setTimeout(cycle, rnd(1550, 2250));
     };
-    this._breath = { stop: () => { alive = false; }, timer: 0 };
+    this._breath = { stop: () => { alive = false; }, timer: 0, pan: clamp(pan || 0, -1, 1) };
     cycle();
   }
 
@@ -833,6 +900,7 @@ export class Sound {
     this.buzzOff();
     this._stopHeart();
     this.breathOff();
+    this._dangerOff();
     this.roomToneOff();
     this.waterOff();
     this.crtOff();
