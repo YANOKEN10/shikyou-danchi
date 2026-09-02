@@ -1661,6 +1661,8 @@ export function animateEntity(ent, dt, moving) {
   const breathe = 1 + Math.sin(u.phase * 0.53) * 0.006;
   u.photo.scale.set(breathe, 1, 1);
   u.photo.position.y = u.H / 2;
+  // 近接用の別姿勢は立体芯を隠すため、写真面も中心側へ戻してカメラを突き抜けないようにする。
+  u.photo.position.z = u.pose === "stand" ? 0.32 : 0.08;
 
   // 体勢画像は正方形の区画なので、姿勢ごとに縦横比と床からの高さを戻す。
   if (u.pose === "crouch") { u.photo.scale.set(1.14 * breathe, 0.66, 1); u.photo.position.y = 0.66; }

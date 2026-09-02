@@ -261,7 +261,7 @@ export class Haunts {
   _cameraVisitor() {
     const g = this.g;
     const f = g.player.forward();
-    const dist = 0.3;
+    const dist = 0.16;
     const mat = new THREE.MeshBasicMaterial({
       map: APPARITION_MAPS.toilet, transparent: true, opacity: 0, depthWrite: false,
       depthTest: false, side: THREE.DoubleSide,
@@ -274,10 +274,10 @@ export class Haunts {
     g.floor.group.add(mesh);
     g.snd.stinger(); g.ui.hit();
     this._add({
-      kind: "cameraVisitor", life: 0.78,
+      kind: "cameraVisitor", life: 1.55,
       step: (e) => {
         // 瞬間表示でも一枚絵の点滅に見えないよう、短い出現・静止・消失の順にする。
-        mat.opacity = Math.min(1, e.t / 0.08, (e.life - e.t) / 0.2) * 0.98;
+        mat.opacity = Math.min(1, e.t / 0.08, (e.life - e.t) / 0.3) * 0.98;
       },
       end: () => { g.floor.group.remove(mesh); mesh.geometry.dispose(); mat.dispose(); },
     });

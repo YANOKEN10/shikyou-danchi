@@ -102,13 +102,23 @@ export class DreadDirector {
   _mirror() {
     const g = this.g;
     const f = pick(g.floor.fx.filter((x) => x.kind === "mirror"));
-    let rang = false;
+    let rang = false, lunged = false;
     this._setLive({ life: 8.5, step: (e) => {
       const stage = Math.min(2, Math.floor(e.t / 2.4));
       const pulse = 0.28 + stage * 0.24;
-      f.mesh.material.opacity = Math.max(f.mesh.material.opacity, pulse * Math.sin(Math.PI * ((e.t % 2.4) / 2.4)));
+      // 飛び出した後まで鏡面の平面像を残すと二体と板絵に見えるため、突進と同時に完全に消す。
+      f.mesh.material.opacity = lunged ? 0 : Math.max(f.mesh.material.opacity, pulse * Math.sin(Math.PI * ((e.t % 2.4) / 2.4)));
       f.mesh.scale.setScalar(1 + stage * 0.14);
       if (!rang && e.t > 0.6) { rang = true; g.snd.mirrorRing(); }
+      if (!lunged && e.t > 5.05) {
+        lunged = true;
+        f.mesh.material.opacity = 0;
+        // 鏡の座標から立体の幽霊を出し、高速で顔面距離まで詰めて「画像の拡大」ではない動きにする。
+        if (g._showApparition(f.x, f.z, 2.4,
+          { mode: "approach", speed: 8.5, stopDistance: 0.18, scale: 1.55, pose: "lean" })) {
+          g.snd.stinger(); g.ui.hit();
+        }
+      }
     }, end: () => { f.mesh.material.opacity = 0; f.mesh.scale.setScalar(1); } });
   }
 
