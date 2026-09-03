@@ -256,7 +256,131 @@ export class UI {
 
   /* ---------- 終幕 ---------- */
 
+  // 黒い文章画面へ直行せず、玄関を抜けて夜明けへ出る距離をCanvasのカメラ移動で見せる。
+  _playExitScene(ending) {
+    return new Promise((resolve) => {
+      const root = document.createElement("div"); root.className = "endcinematic";
+      const canvas = document.createElement("canvas");
+      const caption = document.createElement("div"); caption.className = "endcaption";
+      const skip = document.createElement("button"); skip.className = "endskip"; skip.textContent = "先へ";
+      root.append(canvas, caption, skip); this.el.ending.appendChild(root);
+      this.el.ending.classList.add("show", "cinematic"); this.open = "ending";
+      this.snd.endingDawn(Boolean(ending.best));
+
+      const ctx = canvas.getContext("2d");
+      let w = 0, h = 0, raf = 0, done = false, shownCaption = "";
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const duration = reduce ? 1800 : ending.best ? 10800 : 8800;
+      const started = performance.now();
+      const resize = () => {
+        const dpr = Math.min(devicePixelRatio || 1, 1.6);
+        w = innerWidth; h = innerHeight;
+        canvas.width = Math.max(1, Math.floor(w * dpr)); canvas.height = Math.max(1, Math.floor(h * dpr));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+      const ease = (v) => v * v * (3 - 2 * v);
+      const setCaption = (s) => {
+        if (shownCaption === s) return;
+        shownCaption = s; caption.classList.remove("show");
+        setTimeout(() => { if (!done) { caption.textContent = s; caption.classList.toggle("show", Boolean(s)); } }, 120);
+      };
+      const finish = () => {
+        if (done) return; done = true; cancelAnimationFrame(raf);
+        removeEventListener("resize", resize); root.remove();
+        this.el.ending.classList.remove("cinematic"); resolve();
+      };
+      skip.onclick = finish; setTimeout(() => { if (!done) skip.classList.add("show"); }, 1300);
+      addEventListener("resize", resize); resize();
+
+      const drawSkyAndStreet = (time, dawn) => {
+        const sky = ctx.createLinearGradient(0, 0, 0, h);
+        sky.addColorStop(0, `rgb(${4 + dawn * 38},${7 + dawn * 38},${16 + dawn * 48})`);
+        sky.addColorStop(0.68, `rgb(${12 + dawn * 78},${18 + dawn * 48},${28 + dawn * 36})`);
+        sky.addColorStop(1, `rgb(${22 + dawn * 90},${22 + dawn * 55},${25 + dawn * 42})`);
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+        const horizon = h * 0.57;
+        ctx.fillStyle = `rgba(5,8,12,${0.9 - dawn * 0.2})`;
+        for (let i = 0; i < 12; i++) {
+          const bw = w / 11 + (i % 3) * 13, bh = h * (0.08 + (i % 5) * 0.025);
+          ctx.fillRect(i * w / 11 - 10, horizon - bh, bw, bh);
+        }
+        ctx.fillStyle = `rgb(${17 + dawn * 24},${19 + dawn * 23},${22 + dawn * 21})`;
+        ctx.beginPath(); ctx.moveTo(0, horizon); ctx.lineTo(w, horizon); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.fill();
+        // 濡れた路面の消失点を動かし、静止画ではなく前へ歩いている感覚を出す。
+        const drift = (time * 46) % 70;
+        ctx.strokeStyle = `rgba(132,145,150,${0.10 + dawn * 0.08})`; ctx.lineWidth = 1;
+        for (let y = horizon + drift; y < h; y += 70) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+        ctx.strokeStyle = `rgba(178,159,128,${0.08 + dawn * 0.1})`;
+        ctx.beginPath(); ctx.moveTo(w * 0.5, horizon); ctx.lineTo(w * 0.35, h); ctx.moveTo(w * 0.5, horizon); ctx.lineTo(w * 0.65, h); ctx.stroke();
+        // 雨粒は座標を時刻から計算し、画像素材なしでも奥行きの違う速度で流す。
+        for (let i = 0; i < 85; i++) {
+          const depth = 0.25 + (i % 9) / 9, x = (i * 83.7 + time * (34 + depth * 70)) % (w + 80) - 40;
+          const y = (i * 47.3 + time * (120 + depth * 210)) % (h + 80) - 40;
+          ctx.strokeStyle = `rgba(185,204,211,${0.035 + depth * 0.09})`;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 4 * depth, y + 12 * depth); ctx.stroke();
+        }
+      };
+
+      const drawBuilding = (p, alpha) => {
+        const scale = 1.18 - ease(p) * 0.35;
+        const bw = Math.min(w * 0.78, 760) * scale, bh = h * 0.64 * scale;
+        const bx = w / 2 - bw / 2, by = h * 0.54 - bh / 2;
+        ctx.save(); ctx.globalAlpha = alpha;
+        const wall = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+        wall.addColorStop(0, "#202629"); wall.addColorStop(0.5, "#3c3f3d"); wall.addColorStop(1, "#171d20");
+        ctx.fillStyle = wall; ctx.fillRect(bx, by, bw, bh);
+        ctx.fillStyle = "rgba(0,0,0,.18)";
+        for (let i = 0; i < 16; i++) ctx.fillRect(bx + ((i * 71) % bw), by, 2 + (i % 3), bh);
+        const floors = 5, cols = 6, pad = bw * 0.055, gapX = bw * 0.022;
+        const ww = (bw - pad * 2 - gapX * (cols - 1)) / cols, fh = bh / floors;
+        for (let row = 0; row < floors; row++) {
+          ctx.fillStyle = "rgba(6,9,11,.48)"; ctx.fillRect(bx, by + row * fh + fh * 0.69, bw, fh * 0.07);
+          ctx.strokeStyle = "rgba(125,132,128,.28)"; ctx.beginPath(); ctx.moveTo(bx, by + row * fh + fh * 0.74); ctx.lineTo(bx + bw, by + row * fh + fh * 0.74); ctx.stroke();
+          for (let col = 0; col < cols; col++) {
+            const x = bx + pad + col * (ww + gapX), y = by + row * fh + fh * 0.14;
+            const mother = row === 0 && col === 4;
+            const blink = mother && p > 0.56 && p < 0.72 ? (Math.sin(p * 92) > -0.15 ? 1 : 0.12) : mother ? Math.max(0, 1 - p * 0.9) : 0;
+            ctx.fillStyle = mother ? `rgba(222,177,101,${0.18 + blink * 0.58})` : "rgba(2,5,8,.92)";
+            ctx.fillRect(x, y, ww, fh * 0.46);
+            ctx.strokeStyle = "rgba(126,130,122,.32)"; ctx.strokeRect(x, y, ww, fh * 0.46);
+            ctx.beginPath(); ctx.moveTo(x + ww / 2, y); ctx.lineTo(x + ww / 2, y + fh * 0.46); ctx.stroke();
+          }
+        }
+        ctx.fillStyle = "rgba(0,0,0,.88)"; ctx.fillRect(w / 2 - bw * 0.055, by + bh * 0.82, bw * 0.11, bh * 0.18);
+        if (ending.best && p > 0.45 && p < 0.82) {
+          const a = Math.sin(Math.min(1, (p - 0.45) / 0.12) * Math.PI / 2) * Math.min(1, (0.82 - p) / 0.14);
+          ctx.globalAlpha = alpha * Math.max(0, a) * 0.72; ctx.fillStyle = "#020203";
+          ctx.beginPath(); ctx.ellipse(w / 2, by + bh * 0.83, bw * 0.026, bh * 0.095, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(w / 2, by + bh * 0.715, bw * 0.018, bh * 0.033, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      };
+
+      const frame = (now) => {
+        const elapsed = now - started, p = Math.min(1, elapsed / duration), time = elapsed / 1000;
+        const dawn = ease(Math.max(0, (p - 0.16) / 0.84));
+        ctx.clearRect(0, 0, w, h); drawSkyAndStreet(time, dawn);
+        if (p < 0.43) {
+          const open = ease(Math.min(1, p / 0.24));
+          const side = w * (0.48 - open * 0.43);
+          ctx.fillStyle = "#030405"; ctx.fillRect(0, 0, side, h); ctx.fillRect(w - side, 0, side, h);
+          ctx.fillStyle = "rgba(28,31,31,.9)"; ctx.fillRect(side, 0, 7, h); ctx.fillRect(w - side - 7, 0, 7, h);
+          const lintel = h * (0.22 - open * 0.17); ctx.fillStyle = "#030405"; ctx.fillRect(0, 0, w, lintel);
+        } else {
+          const turn = ease(Math.min(1, (p - 0.43) / 0.2));
+          ctx.fillStyle = `rgba(1,2,4,${Math.sin(turn * Math.PI) * 0.82})`; ctx.fillRect(0, 0, w, h);
+          drawBuilding((p - 0.43) / 0.57, turn);
+        }
+        if (p < 0.38) setCaption("夜明け前　四号棟を出る");
+        else if (p < 0.74) setCaption(ending.best ? "足音は、敷居の内側で止まった。" : "背後で、足音が止まった。");
+        else setCaption(ending.best ? "元気でね。" : "私は、外へ歩き出した。");
+        if (p >= 1) finish(); else raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+    });
+  }
   async showEnding(ending, stats, onAgain) {
+    if (!ending.bad) await this._playExitScene(ending);
     const b = this.el.endingBody;
     b.innerHTML = "";
 

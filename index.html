@@ -352,6 +352,29 @@
   .msg.err { color: #d09070; }
   .msg.ok { color: #a8bb8a; }
 
+  /* 終幕の外景は画像を貼らずCanvasで描き、画面比率が違っても団地と夜明けを同じ構図で見せる。 */
+  #ending.cinematic { padding: 0; overflow: hidden; background: #010207; backdrop-filter: none; }
+  #ending.cinematic .panel { visibility: hidden; }
+  .endcinematic { position: fixed; inset: 0; z-index: 1; overflow: hidden; background: #010207; }
+  .endcinematic canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .endcinematic::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 45%, transparent 35%, rgba(0,0,0,.68) 100%);
+  }
+  .endcaption {
+    position: absolute; z-index: 2; left: 50%; bottom: 11vh; transform: translateX(-50%);
+    width: min(780px, 86vw); text-align: center; font-family: var(--mincho);
+    color: #e1ddd2; font-size: clamp(15px, 2.3vw, 22px); letter-spacing: .12em;
+    text-shadow: 0 2px 14px #000, 0 0 36px #000; opacity: 0; transition: opacity 1.2s ease;
+  }
+  .endcaption.show { opacity: .94; }
+  .endskip {
+    position: absolute; z-index: 3; right: 18px; bottom: 16px; width: auto; margin: 0;
+    padding: 7px 13px; border: 1px solid rgba(220,214,200,.22); background: rgba(2,3,6,.48);
+    color: rgba(220,214,200,.62); font-size: 11px; letter-spacing: .1em; opacity: 0;
+    transition: opacity .7s ease;
+  }
+  .endskip.show { opacity: 1; }
   /* 終幕 */
   #ending .panel { max-width: 640px; background: #06070a; border-color: #1a1c20; }
   .endlines { font-family: var(--mincho); font-size: 15.5px; line-height: 2.2; color: #d8d2c2; margin: 18px 0; }

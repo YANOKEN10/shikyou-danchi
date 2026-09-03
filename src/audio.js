@@ -559,6 +559,24 @@ export class Sound {
     src.stop(t + 3.1);
   }
 
+  // 恐怖音が止んだあとにだけ鳴る外気。低音を解き、二度の灯りに合わせて柔らかな倍音を置く。
+  endingDawn(best) {
+    if (!this.ready || this.muted) return;
+    this.allOff();
+    const ctx = this.ctx, t = this.t;
+    const src = this._src(false);
+    const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 520;
+    const gain = ctx.createGain(); gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(0.055, t + 1.5);
+    gain.gain.linearRampToValueAtTime(0.018, t + 8.5);
+    src.connect(filter); filter.connect(gain); gain.connect(this.master);
+    src.start(t, Math.random()); src.stop(t + 9);
+    if (best) {
+      [4.9, 5.55].forEach((delay, i) => setTimeout(() => {
+        this.tone({ type: "sine", f0: i ? 392 : 294, f1: i ? 440 : 330, vol: 0.075, dur: 1.6, atk: 0.18, wet: 1.15 });
+      }, delay * 1000));
+    }
+  }
   // 蛍光灯が切れる
   tubePop() {
     this.burst({ type: "highpass", freq: 1900, vol: 0.30, dur: 0.012, atk: 0.001, wet: 0.9 });

@@ -115,7 +115,7 @@ export class DreadDirector {
         f.mesh.material.opacity = 0;
         // 鏡の座標から立体の幽霊を出し、高速で顔面距離まで詰めて「画像の拡大」ではない動きにする。
         if (g._showApparition(f.x, f.z, 2.4,
-          { mode: "approach", speed: 8.5, stopDistance: 0.18, scale: 1.55, pose: "lean" })) {
+          { mode: "approach", speed: 8.5, stopDistance: 0.40, scale: 1.55, pose: "lean" })) {
           g.snd.stinger("close"); g.ui.hit();
         }
       }

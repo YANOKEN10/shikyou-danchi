@@ -57,9 +57,6 @@ function generatedTexture(path, rx = 1, ry = 1) {
 }
 const generatedWall = generatedTexture("./assets/generated/wall-aged.webp", 2, 1);
 const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 2, 2);
-// URLを更新して旧版がブラウザキャッシュに残っていても、現在の「それ」を必ず再取得させる。
-const generatedEntity = generatedTexture("./assets/generated/entity-photoreal.webp?v=20260830-2");
-const generatedEntityPoses = generatedTexture("./assets/generated/entity-poses-atlas-v1.png?v=20260901");
 const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-v2.png?v=20260830");
 const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v1.png?v=20260831");
 // 四分割素材では鏡の中で顔が小さく潰れたため、鏡だけは縦長の専用画像を原寸で使う。
@@ -76,19 +73,6 @@ function interiorTexture(col, row) {
   tex.offset.set(col / 3, row === 0 ? 1 / 2 : 0);
   return tex;
 }
-
-// 体を縦につぶしただけの姿勢に見せないため、生成した四体勢を原寸の区画から切り出す。
-function entityPoseTexture(col, row) {
-  const tex = generatedEntityPoses.clone();
-  tex.needsUpdate = true;
-  tex.repeat.set(1 / 2, 1 / 2);
-  tex.offset.set(col / 2, row === 0 ? 1 / 2 : 0);
-  return tex;
-}
-const ENTITY_POSE_MAPS = {
-  crouch: entityPoseTexture(0, 0), crawl: entityPoseTexture(1, 0),
-  lean: entityPoseTexture(0, 1), kneel: entityPoseTexture(1, 1),
-};
 
 // 水回り専用の四区画素材。共通画像から切り出して床・戸・照明の年代感を揃える。
 function wetAreaTexture(col, row) {
@@ -1464,142 +1448,170 @@ function buildBlob(mat, base, scale) {
 //  顔はほとんど髪で隠れていて、光が当たったときだけ見える。
 export function buildEntity() {
   const g = new THREE.Group();
-  const H = 1.92;                 // 見上げる高さ
+  const H = 1.92;
+  const rig = new THREE.Group();
+  g.add(rig);
 
-  // 正面の生成画像を主役にしつつ、横からは衣服の厚みが読める暗さへ抑える。
-  const cloth = new THREE.MeshLambertMaterial({ map: TX.shroud(), color: 0x343740 });
-  const clothDark = new THREE.MeshLambertMaterial({ color: 0x131318 });
-  // 懐中電灯を至近で当てても白く飛ばない暗さにする。顔は下の絵で見せる
-  const skin = new THREE.MeshLambertMaterial({ color: 0x171512 });   // 頭は暗く。顔は下の絵で見せる
-  const pale = new THREE.MeshLambertMaterial({ color: 0x857f74 });
+  // 正面画像を貼らず、粗さ・凹凸・奥行きを持つ部品だけで全身を構成する。
+  // 至近距離や真横でも輪郭が破綻しないことを、見た目の最優先にする。
+  const shroud = TX.shroud();
+  const cloth = new THREE.MeshStandardMaterial({
+    map: shroud, bumpMap: shroud, bumpScale: 0.035, color: 0x34363a,
+    roughness: 0.96, metalness: 0.01, side: THREE.DoubleSide,
+  });
+  const clothDark = new THREE.MeshStandardMaterial({ color: 0x111116, roughness: 1 });
+  const skin = new THREE.MeshStandardMaterial({
+    color: 0x777168, roughness: 0.84, metalness: 0.02,
+    emissive: 0x120f0d, emissiveIntensity: 0.32,
+  });
+  const bruised = new THREE.MeshStandardMaterial({ color: 0x302526, roughness: 0.92 });
+  const mouthMat = new THREE.MeshStandardMaterial({ color: 0x030202, roughness: 0.55 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x010101, roughness: 0.08, metalness: 0.1 });
+  const wetHair = new THREE.MeshStandardMaterial({ color: 0x08090b, roughness: 0.28, metalness: 0.08 });
+  const toothMat = new THREE.MeshStandardMaterial({ color: 0x9a927d, roughness: 0.72 });
 
-  // 胴。肩から裾へ、まっすぐ広がる長い衣
-  // 胴。裾は床まで下ろさず、下は別に作った不規則な裾でつなぐ
   const prof = [
-    [0.335, 0.20], [0.315, 0.40], [0.285, 0.66],
-    [0.235, 1.00], [0.205, 1.22], [0.225, 1.36], [0.215, 1.48],
-    [0.155, 1.58], [0.075, 1.64],
+    [0.36, 0.18], [0.34, 0.42], [0.31, 0.72], [0.26, 1.05],
+    [0.23, 1.28], [0.26, 1.43], [0.22, 1.53], [0.10, 1.63],
   ].map(([r, y]) => new THREE.Vector2(r, y));
-  const body = new THREE.Mesh(new THREE.LatheGeometry(prof, HEM_N), cloth);
-  g.add(body);
+  const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 28), cloth);
+  body.scale.z = 0.72;
+  rig.add(body);
 
-  // 裾。円ではなく、房ごとに長さも高さも違う。歩くと後ろへ流れる
-  const hem = buildHem(clothDark, 0.335, 0.20);
-  g.add(hem);
+  // 胸元の縫い目と皺を実形状にし、平たい円錐の服に見えないよう陰影を増やす。
+  for (let i = -2; i <= 2; i++) {
+    const seam = new THREE.Mesh(new THREE.CapsuleGeometry(0.006, 0.72, 3, 6), clothDark);
+    seam.position.set(i * 0.085, 1.03, 0.205 - Math.abs(i) * 0.018);
+    seam.rotation.z = i * 0.035;
+    rig.add(seam);
+  }
 
-  // 床の影。これも円にしない
-  const shadow = buildBlob(new THREE.MeshBasicMaterial({ color: 0x000000 }), hem.userData.base, 0.86);
+  const hem = buildHem(clothDark, 0.36, 0.18);
+  hem.scale.z = 0.82;
+  rig.add(hem);
+  const shadow = buildBlob(new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.82 }), hem.userData.base, 0.94);
   shadow.position.y = 0.011;
   g.add(shadow);
 
-  // 肩から先。腕は長すぎて、膝の下まで垂れている
-  const arms = [];
-  [-1, 1].forEach((s) => {
+  const arms = [], hands = [];
+  [-1, 1].forEach((side) => {
     const pivot = new THREE.Group();
-    pivot.position.set(s * 0.20, 1.50, 0.02);
-    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.033, 0.52, 3, 7), cloth);
-    upper.position.y = -0.28;
-    const fore = new THREE.Mesh(new THREE.CapsuleGeometry(0.026, 0.46, 3, 7), cloth);
-    fore.position.y = -0.76;
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 7), pale);
-    hand.scale.set(0.7, 1.7, 0.45);
-    hand.position.y = -1.03;
-    pivot.add(upper, fore, hand);
-    g.add(pivot);
-    arms.push(pivot);
+    pivot.position.set(side * 0.235, 1.47, 0.015);
+    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.43, 5, 10), cloth);
+    upper.position.y = -0.25;
+    const elbow = new THREE.Group(); elbow.position.y = -0.5;
+    const fore = new THREE.Mesh(new THREE.CapsuleGeometry(0.042, 0.43, 5, 10), cloth);
+    fore.position.y = -0.24;
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 10), skin);
+    hand.scale.set(0.72, 1.48, 0.52); hand.position.y = -0.51;
+    elbow.add(fore, hand);
+    // 指を一本ずつ作り、近接時に手が球へ見える弱点をなくす。
+    const fingers = [];
+    for (let j = 0; j < 5; j++) {
+      const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.10 + j * 0.012, 3, 6), skin);
+      finger.position.set((j - 2) * 0.017, -0.59 - Math.abs(j - 2) * 0.007, 0.012);
+      finger.rotation.z = (j - 2) * -0.055;
+      elbow.add(finger); fingers.push(finger);
+    }
+    pivot.add(upper, elbow); rig.add(pivot);
+    pivot.userData.elbow = elbow; pivot.userData.fingers = fingers;
+    arms.push(pivot); hands.push(hand);
   });
 
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.082, 0.16, 14), skin);
+  neck.position.y = 1.66; rig.add(neck);
+  const headPivot = new THREE.Group(); headPivot.position.y = 1.81; rig.add(headPivot);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.17, 28, 22), skin);
+  skull.scale.set(0.92, 1.18, 0.88); headPivot.add(skull);
 
-  // 首と頭
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, 0.12, 8), skin);
-  neck.position.y = 1.665;
-  g.add(neck);
-
-  const headPivot = new THREE.Group();
-  headPivot.position.y = 1.795;
-  g.add(headPivot);
-
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.137, 16, 14), skin);
-  skull.scale.set(1.02, 1.28, 0.90);
-  headPivot.add(skull);
-
-  // 顔。暗くても、うっすら見えるように光らせておく
-  const faceMat = new THREE.MeshBasicMaterial({
-    map: TX.face(), transparent: true, opacity: 0.95, depthWrite: false,
+  // 頬・顎・鼻を別形状で重ね、顔を一枚のお面ではなく凹凸のある骨格として見せる。
+  [-1, 1].forEach((side) => {
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.073, 18, 12), skin);
+    cheek.scale.set(0.8, 1.0, 0.46); cheek.position.set(side * 0.072, -0.035, 0.125);
+    headPivot.add(cheek);
+    const socket = new THREE.Mesh(new THREE.SphereGeometry(0.056, 18, 12), bruised);
+    socket.scale.set(1.18, 0.72, 0.42); socket.position.set(side * 0.066, 0.045, 0.142);
+    headPivot.add(socket);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.038, 20, 14), eyeMat);
+    eye.scale.set(1.12, 0.82, 0.72); eye.position.set(side * 0.066, 0.043, 0.174);
+    headPivot.add(eye);
+    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.005, 8, 6), new THREE.MeshBasicMaterial({ color: 0xc8d5d2 }));
+    glint.position.set(side * 0.054, 0.054, 0.207); headPivot.add(glint);
   });
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.285, 0.375), faceMat);
-  face.position.set(0, -0.045, 0.171);
-  // 新しい全身素材の顔と二重に表示されていた旧Canvas顔は描画しない。
-  // マテリアル自体は互換性のため残し、既存の演出コードが参照しても壊れないようにする。
-  face.visible = false;
-  headPivot.add(face);
+  const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.105, 22, 14), skin);
+  jaw.scale.set(0.83, 0.78, 0.62); jaw.position.set(0, -0.132, 0.074); headPivot.add(jaw);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.034, 0.105, 10), skin);
+  nose.rotation.x = Math.PI / 2; nose.position.set(0, -0.012, 0.195); headPivot.add(nose);
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.072, 22, 14), mouthMat);
+  mouth.scale.set(1, 0.62, 0.3); mouth.position.set(0, -0.116, 0.157); headPivot.add(mouth);
+  const teeth = [];
+  for (let i = 0; i < 9; i++) {
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.034 + (i % 2) * 0.009, 6), toothMat);
+    tooth.position.set((i - 4) * 0.014, -0.092, 0.183); tooth.rotation.z = Math.PI + (i - 4) * 0.018;
+    headPivot.add(tooth); teeth.push(tooth);
+  }
 
-  // 髪。頭から胸の下まで、房になって垂れる
-  const hairMat = new THREE.MeshLambertMaterial({
-    map: TX.hair(), color: 0x32323b, transparent: true, side: THREE.FrontSide, depthWrite: false,
+  // 傷は線を描いた板ではなく細い管として皮膚に沿わせ、斜めからも浮き上がって見えるようにする。
+  const scars = [];
+  [[-0.12, 0.09, -0.055, -0.09], [0.105, 0.12, 0.045, -0.07], [-0.02, 0.13, 0.025, 0.03]].forEach(([x0, y0, x1, y1]) => {
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(x0, y0, 0.169), new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2 + 0.018, 0.202),
+      new THREE.Vector3(x1, y1, 0.177),
+    ]);
+    const scar = new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 0.0035, 5, false), bruised);
+    headPivot.add(scar); scars.push(scar);
   });
-  const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.158, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.92), hairMat);
-  hairTop.scale.set(1.02, 1.22, 1.02);
-  headPivot.add(hairTop);
 
-  const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.162, 0.22, 0.88, 18, 1, true), hairMat);
-  veil.position.y = -0.50;
-  headPivot.add(veil);
-
-  // 前髪。顔をほとんど覆う
-  // 顔の前に垂れる髪。これがないと、顔がお面に見えてしまう
-  const bangMat = new THREE.MeshLambertMaterial({
-    map: TX.hairFront(), color: 0x4a4a55, transparent: true, side: THREE.FrontSide, depthWrite: false,
+  const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.184, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.78), wetHair);
+  hairTop.scale.set(1.03, 1.14, 1.03); hairTop.position.y = 0.035; headPivot.add(hairTop);
+  const hairStrands = [];
+  // 目と口を隠し切らない位置へ濡れ髪を束で垂らし、以前の「怖い顔が見えない」状態を避ける。
+  [-0.17, -0.145, -0.12, -0.095, 0.10, 0.13, 0.16].forEach((x, i) => {
+    const strand = new THREE.Group();
+    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.012 + (i % 2) * 0.004, 0.34 + (i % 3) * 0.08, 4, 7), wetHair);
+    upper.position.y = -0.18 - (i % 2) * 0.05;
+    upper.rotation.z = x * 0.55;
+    const lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.38 + (i % 2) * 0.11, 4, 7), wetHair);
+    lower.position.y = -0.54 - (i % 3) * 0.035; lower.rotation.z = -x * 0.4;
+    strand.position.set(x, 0.025, 0.13 - Math.abs(x) * 0.18);
+    strand.add(upper, lower); headPivot.add(strand); hairStrands.push(strand);
   });
-  const bang = new THREE.Mesh(new THREE.PlaneGeometry(0.50, 0.98), bangMat);
-  bang.position.set(0, -0.295, 0.176);
-  // 写実素材の濡れ髪を使うため、四角い輪郭が出る旧前髪は影としても表示しない。
-  bang.visible = false;
-  headPivot.add(bang);
+  // 後頭部の髪は厚い殻で作り、真横から頭部が空洞に見えないようにする。
+  const backHair = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.52, 8, 18), wetHair);
+  backHair.scale.set(1.02, 1, 0.68); backHair.position.set(0, -0.28, -0.075); headPivot.add(backHair);
 
-  // 旧Canvas顔と四角い前髪だけは消したまま、胴・頭・髪・腕を暗い芯として残す。
-  // 写真一枚だけでは真横から厚さがゼロになるため、生成画像の輪郭より内側に立体を収める。
-  body.scale.z = 0.78;
-  hem.scale.z = 0.82;
-  skull.scale.z = 0.92;
-  veil.scale.z = 0.84;
-
-  // 顔が髪で隠れない全身素材は正面の表情を担当し、立体側は側面と背面だけを補う。
-  const photoMat = new THREE.MeshBasicMaterial({
-    map: generatedEntity, transparent: true, alphaTest: 0.045,
-    // 黒背景は加算合成では光を足さないため消え、肌と衣服の細部だけを立体へ重ねられる。
-    depthWrite: false, side: THREE.DoubleSide, color: 0x737b80,
-    opacity: 0.88, blending: THREE.AdditiveBlending,
-  });
-  const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.28, H), photoMat);
-  // 胴体より手前へ出し、立体が写真面を突き抜けて胸元に穴のような形を作らないようにする。
-  photo.position.set(0, H / 2, 0.32);
-  g.add(photo);
-
-  // この一体だけ、別の層で照らす（懐中電灯で白飛びさせないため）
-  g.traverse((o) => o.layers.set(1));
-
+  g.traverse((o) => { o.layers.set(1); if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   g.userData = {
-    body, hem, shadow, arms, headPivot, face: faceMat, veil, photo,
-    defaultPhoto: generatedEntity, poseMaps: ENTITY_POSE_MAPS, pose: "stand", poseMap: generatedEntity,
-    phase: Math.random() * 6, twitch: 2 + Math.random() * 4, tilt: 0, H,
-    hemT: Math.random() * 10,
+    rig, body, hem, shadow, arms, hands, headPivot, skull, mouth, teeth,
+    veil: backHair, hairStrands, pose: "stand", phase: Math.random() * 6,
+    twitch: 2 + Math.random() * 4, tilt: 0, H, hemT: Math.random() * 10,
   };
+  setEntityPose(g, "stand", true);
   return g;
 }
 
-// 本体と演出用の分身が同じ体勢素材を使えるよう、切替処理を一か所に集める。
-export function setEntityPose(ent, pose) {
+// 画像を切り替えず、同じ3D骨格の重心・関節・高さを変えて各体勢を作る。
+export function setEntityPose(ent, pose, force) {
   const u = ent && ent.userData;
-  if (!u || !u.photo) return;
-  const next = pose && u.poseMaps[pose] ? pose : "stand";
-  const map = next === "stand" ? u.defaultPhoto : u.poseMaps[next];
-  if (u.poseMap !== map) {
-    u.poseMap = map;
-    u.photo.material.map = map;
-    u.photo.material.needsUpdate = true;
-  }
+  if (!u || !u.rig) return;
+  const next = ["stand", "crouch", "crawl", "lean", "kneel"].includes(pose) ? pose : "stand";
+  if (!force && u.pose === next) return;
   u.pose = next;
+  u.rig.position.set(0, 0, 0); u.rig.rotation.set(0, 0, 0); u.rig.scale.set(1, 1, 1);
+  u.arms.forEach((arm, i) => { arm.rotation.set(0, 0, i ? -0.05 : 0.05); arm.userData.elbow.rotation.set(0, 0, 0); });
+  if (next === "crouch") {
+    u.rig.scale.set(1.1, 0.72, 1.08); u.rig.rotation.x = 0.12;
+    u.arms.forEach((arm, i) => { arm.rotation.x = -0.55; arm.userData.elbow.rotation.x = -0.75; arm.rotation.z = i ? -0.28 : 0.28; });
+  } else if (next === "crawl") {
+    u.rig.position.set(0, 0.42, 0.18); u.rig.rotation.x = -1.05; u.rig.scale.set(1.05, 0.78, 1.05);
+    u.arms.forEach((arm, i) => { arm.rotation.x = -1.15; arm.rotation.z = i ? -0.5 : 0.5; arm.userData.elbow.rotation.x = -0.8; });
+  } else if (next === "lean") {
+    u.rig.position.z = 0.13; u.rig.rotation.x = 0.34; u.rig.scale.set(1.03, 0.94, 1.08);
+    u.arms.forEach((arm) => { arm.rotation.x = -0.3; });
+  } else if (next === "kneel") {
+    u.rig.scale.set(1.07, 0.76, 1.04); u.rig.position.y = 0.02;
+    u.arms.forEach((arm, i) => { arm.rotation.x = -0.72; arm.rotation.z = i ? -0.2 : 0.2; });
+  }
 }
 
 /* ---------- 友達（住人）の姿 ---------- */
@@ -1651,40 +1663,27 @@ export function buildSurvivor(name) {
 export function animateEntity(ent, dt, moving) {
   const u = ent.userData;
   u.phase += dt * (moving ? 2.6 : 0.8);
+  const s = Math.sin(u.phase), breathe = 1 + Math.sin(u.phase * 0.53) * 0.012;
 
-  // 足を動かさない。裾ごと、すべるように運ぶ
-  const s = Math.sin(u.phase);
+  // 全身の立体部品を呼吸させ、写真面の拡縮に頼らず生体らしい微動を作る。
   ent.position.y = Math.abs(Math.sin(u.phase * 1.7)) * (moving ? 0.022 : 0.006);
+  u.body.scale.x = breathe; u.body.scale.z = 0.72 * breathe;
   u.body.rotation.z = s * (moving ? 0.022 : 0.006);
-  // 写実素材にも呼吸のような微動だけを与え、板絵に見える静止感を弱める。
-  u.photo.rotation.z = s * (moving ? 0.012 : 0.003);
-  const breathe = 1 + Math.sin(u.phase * 0.53) * 0.006;
-  u.photo.scale.set(breathe, 1, 1);
-  u.photo.position.y = u.H / 2;
-  // 近接用の別姿勢は立体芯を隠すため、写真面も中心側へ戻してカメラを突き抜けないようにする。
-  u.photo.position.z = u.pose === "stand" ? 0.32 : 0.08;
-
-  // 体勢画像は正方形の区画なので、姿勢ごとに縦横比と床からの高さを戻す。
-  if (u.pose === "crouch") { u.photo.scale.set(1.14 * breathe, 0.66, 1); u.photo.position.y = 0.66; }
-  else if (u.pose === "crawl") { u.photo.scale.set(1.2 * breathe, 0.62, 1); u.photo.position.y = 0.61; }
-  else if (u.pose === "lean") { u.photo.scale.set(1.02 * breathe, 0.92, 1); u.photo.position.y = 0.92; }
-  else if (u.pose === "kneel") { u.photo.scale.set(1.04 * breathe, 0.86, 1); u.photo.position.y = 0.85; }
-  const coreVisible = u.pose === "stand";
-  // 別姿勢の実写面と直立した立体芯を重ねると手足が増えるため、その間だけ芯を隠す。
-  u.body.visible = coreVisible; u.hem.visible = coreVisible; u.headPivot.visible = coreVisible;
-  u.arms.forEach((arm) => { arm.visible = coreVisible; });
-
-  // 裾。歩いているときほど後ろへ流れ、房ごとにばらばらに揺れる
   u.hemT += dt * (moving ? 2.4 : 0.9);
   animateHem(u.hem, u.hemT, moving ? 1 : 0.18);
 
-  // 腕は、ゆっくり前後に振れるだけ
-  u.arms[0].rotation.x = s * (moving ? 0.16 : 0.03);
-  u.arms[1].rotation.x = -s * (moving ? 0.16 : 0.03);
-  u.arms[0].rotation.z = 0.05 + s * 0.02;
-  u.arms[1].rotation.z = -0.05 - s * 0.02;
+  // 体勢ごとの基準角へ小さな関節運動だけを足し、走査ごとに姿勢が初期化されないようにする。
+  const armLean = u.pose === "crawl" ? -1.15 : u.pose === "kneel" ? -0.72 : u.pose === "crouch" ? -0.55 : u.pose === "lean" ? -0.3 : 0;
+  const armSpread = u.pose === "crawl" ? 0.5 : u.pose === "crouch" ? 0.28 : u.pose === "kneel" ? 0.2 : 0.05;
+  u.arms[0].rotation.x = armLean + s * (moving ? 0.16 : 0.025);
+  u.arms[1].rotation.x = armLean - s * (moving ? 0.16 : 0.025);
+  u.arms[0].rotation.z = armSpread + s * 0.018;
+  u.arms[1].rotation.z = -armSpread - s * 0.018;
+  u.arms.forEach((arm, i) => {
+    arm.userData.elbow.rotation.z = (i ? -1 : 1) * Math.sin(u.phase * 0.71) * (moving ? 0.07 : 0.025);
+    arm.userData.fingers.forEach((finger, j) => { finger.rotation.x = Math.sin(u.phase * 0.8 + j * 0.7) * 0.09; });
+  });
 
-  // 首は、たまに変な角度へ「かくん」と落ちる
   u.twitch -= dt;
   if (u.twitch <= 0) {
     u.twitch = 3 + Math.random() * 7;
@@ -1692,9 +1691,13 @@ export function animateEntity(ent, dt, moving) {
   }
   u.headPivot.rotation.z += (u.tilt - u.headPivot.rotation.z) * Math.min(1, dt * 14);
   u.headPivot.rotation.x = Math.sin(u.phase * 0.37) * 0.06;
-
-  // 髪の房が、わずかに遅れて揺れる
-  u.veil.rotation.z = -u.headPivot.rotation.z * 0.35 + s * 0.03;
+  // 口と髪を別々に動かすことで、近距離でも模型全体が一塊に揺れる印象を避ける。
+  u.mouth.scale.y = 0.62 + Math.max(0, Math.sin(u.phase * 0.43)) * 0.1;
+  u.hairStrands.forEach((strand, i) => {
+    strand.rotation.z = -u.headPivot.rotation.z * 0.22 + Math.sin(u.phase * 0.62 + i * 0.8) * (moving ? 0.035 : 0.014);
+    strand.rotation.x = Math.sin(u.phase * 0.48 + i) * 0.025;
+  });
+  u.veil.rotation.z = -u.headPivot.rotation.z * 0.22 + s * 0.018;
 }
 
 /* ---------- 片づけ ---------- */
