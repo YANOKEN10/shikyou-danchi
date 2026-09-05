@@ -22,8 +22,8 @@ export const D = {
   STAIR_Z1: 3.6,
   PARAPET: 1.08,     // 腰壁の高さ
   RAIL: 1.34,
-  UNIT_D: 6.4,       // 住戸の奥行き
-  UNIT_W: 5.2,
+  UNIT_D: 8.2,       // 奥の居室と水回りが窮屈にならない奥行き
+  UNIT_W: 5.7,       // 隣戸の扉間隔を越えない範囲で横幅も広げる
 };
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -65,6 +65,9 @@ const roomSurfacesAtlas = generatedTexture("./assets/generated/room-surfaces-atl
 const butsudanAtlas = generatedTexture("./assets/generated/butsudan-atlas-v1.png?v=20260901");
 const generatedWindow = generatedTexture("./assets/generated/window-night-v1.png?v=20260905");
 const generatedCurtain = generatedTexture("./assets/generated/curtain-decay-v1.png?v=20260905");
+const livedInAtlas = generatedTexture("./assets/generated/lived-in-clutter-atlas-v1.png?v=20260905");
+const fridgeInterior = generatedTexture("./assets/generated/fridge-interior-v1.png?v=20260905");
+const fridgeDoorInside = generatedTexture("./assets/generated/fridge-door-inside-v1.png?v=20260905");
 
 // 一枚の生成画像を六つの素材へ切り分け、通信量を増やさず家具ごとの質感を変える。
 function interiorTexture(col, row) {
@@ -72,6 +75,16 @@ function interiorTexture(col, row) {
   tex.needsUpdate = true;
   tex.repeat.set(1 / 3, 1 / 2);
   // Three.js の画像原点は下なので、row=0 を画像の上段として反転する。
+  tex.offset.set(col / 3, row === 0 ? 1 / 2 : 0);
+  return tex;
+}
+
+// 生成した生活用品を六区画から切り出し、各住戸で違う組み合わせを置けるようにする。
+function livedInTexture(index) {
+  const tex = livedInAtlas.clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1 / 3, 1 / 2);
+  const col = index % 3, row = Math.floor(index / 3);
   tex.offset.set(col / 3, row === 0 ? 1 / 2 : 0);
   return tex;
 }
@@ -171,7 +184,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   const z0 = -0.16, z1 = z0 - D.UNIT_D;
   const x0 = dx - D.UNIT_W / 2, x1 = dx + D.UNIT_W / 2;
   const H = 2.3;
-  const zMid = z0 - 3.1;
+  const zMid = z0 - 3.8;
 
   /* --- 床・天井・壁 --- */
   const f1 = plane(D.UNIT_W, z0 - zMid, mats.entryFloor);      // 手前は台所の床
@@ -244,7 +257,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
 
   /* --- 家財 --- */
   const C = {
-    g, col, inter, fx, mats, dx, x0, x1, z0, z1, zMid, H, room,
+    g, col, inter, fx, mats, dx, x0, x1, z0, z1, zMid, H, room, unit,
     pb(w, h, d, mat, px, py, pz, ry) {
       const m = box(w, h, d, mat);
       m.position.set(px, py, pz);
@@ -265,6 +278,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
 
   commonRoom(C);
   commonWetArea(C);
+  commonClutter(C);
   (FURNISH[room.kind] || FURNISH.kitchen)(C);
 
   /* --- 部屋の中のもの（拾う・読む） --- */
@@ -359,6 +373,65 @@ function commonRoom(C) {
   C.pb(0.09, 0.13, 0.015, mats.plate, x1 - 0.02, 0.32, z1 + 1.6, -Math.PI / 2);
 }
 
+function commonClutter(C) {
+  const { mats, unit, x0, x1, z1, zMid } = C;
+  const seed = Math.abs(Number(unit.no) || 0) % 6;
+  const specs = [
+    // 壁ぎわに寄せることで生活感を増やしても、玄関から奥への歩線は塞がない。
+    [x0 + 0.42, zMid - 0.72, 0.18],
+    [x1 - 0.42, zMid - 1.72, -0.32],
+    [x0 + 0.42, z1 + 1.05, 0.42],
+  ];
+  specs.forEach(([x, z, ry], i) => {
+    const kind = (seed + i * 2) % 6;
+    const g = buildClutterModel(mats.clutter[kind], kind);
+    g.position.set(x, 0.02, z);
+    g.rotation.y = ry;
+    C.g.add(g);
+  });
+}
+
+// 生成画像は立体模型の表面材として使い、横から見ても厚みと輪郭が残るよう部品を組み立てる。
+function buildClutterModel(mat, kind) {
+  const g = new THREE.Group();
+  const add = (m, x, y, z) => { m.position.set(x, y, z); g.add(m); return m; };
+  if (kind === 0) {
+    add(box(0.62, 0.08, 0.44, mat), 0, 0.04, 0);
+    add(box(0.06, 0.38, 0.44, mat), -0.28, 0.23, 0);
+    add(box(0.06, 0.38, 0.44, mat), 0.28, 0.23, 0);
+    for (let i = 0; i < 5; i++) {
+      const cloth = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 7), mat);
+      cloth.scale.set(1.25, 0.62, 0.9); add(cloth, -0.2 + (i % 3) * 0.2, 0.38 + (i % 2) * 0.08, (i % 2) * 0.1 - 0.05);
+    }
+  } else if (kind === 1) {
+    for (let i = 0; i < 7; i++) add(box(0.62 - i * 0.018, 0.035, 0.43, mat), (i % 2) * 0.02, 0.018 + i * 0.035, 0, (i % 2) * 0.04);
+  } else if (kind === 2) {
+    for (const sx of [-1, 1]) {
+      const bag = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 0.52, 10), mat);
+      add(bag, sx * 0.22, 0.26, 0);
+      const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.52, 10), mat);
+      add(bottle, sx * 0.22, 0.56, 0);
+    }
+  } else if (kind === 3) {
+    const kettle = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 10), mat);
+    kettle.scale.y = 0.72; add(kettle, -0.14, 0.22, 0);
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.025, 7, 16, Math.PI), mat);
+    handle.rotation.z = Math.PI; add(handle, -0.14, 0.42, 0);
+    for (const sx of [0.15, 0.34]) add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.18, 12), mat), sx, 0.09, 0.12);
+  } else if (kind === 4) {
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.25, 0.45, 16), mat), -0.08, 0.225, 0);
+    for (let i = 0; i < 3; i++) add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.42 + i * 0.05, 10), mat), 0.24 + i * 0.1, 0.21 + i * 0.025, 0.04);
+  } else {
+    add(box(0.58, 0.38, 0.2, mat), 0, 0.2, 0);
+    for (const sx of [-0.2, 0.2]) {
+      const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.035, 10), mat);
+      knob.rotation.x = Math.PI / 2; add(knob, sx, 0.2, 0.12);
+    }
+    add(box(0.22, 0.27, 0.06, mat), 0.38, 0.145, 0.04);
+  }
+  return g;
+}
+
 /* ---------- どの部屋にもある水まわり ---------- */
 
 function hingedDoor(C, opt) {
@@ -376,12 +449,12 @@ function hingedDoor(C, opt) {
 
 function commonWetArea(C) {
   const { mats, x0, x1, z0, H } = C;
-  const front = z0 - 0.25, back = z0 - 2.85;
-  const left = x0 + 0.12, right = x0 + 1.62;
-  const doorW = 0.68;
+  const front = z0 - 0.25, back = z0 - 3.55;
+  const left = x0 + 0.12, right = x0 + 2.05;
+  const doorW = 0.78;
 
   // 水まわりを左へ寄せ、玄関から居室まで一直線に歩ける幅を中央に残す。
-  const split = z0 - 1.52;
+  const split = z0 - 1.88;
   // 同じ新品タイルを敷き通すと間取りが読めないため、トイレと浴室で汚れ方と目地を変える。
   C.pb(right - left, 0.06, front - split, mats.wetToiletFloor, (left + right) / 2, 0.035, (front + split) / 2);
   C.pb(right - left, 0.06, split - back, mats.wetBathFloor, (left + right) / 2, 0.035, (split + back) / 2);
@@ -390,7 +463,7 @@ function commonWetArea(C) {
 
   // 廊下側の壁は戸口だけ切り欠く。戸を開けたときだけ当たり判定も外す。
   const makeFront = (za, zb, name) => {
-    const gap0 = za + 0.28, gap1 = gap0 + doorW;
+    const gap0 = za + 0.36, gap1 = gap0 + doorW;
     C.pb(0.08, H, gap0 - za, mats.wetWall, right, H / 2, (za + gap0) / 2);
     C.pb(0.08, H, zb - gap1, mats.wetWall, right, H / 2, (gap1 + zb) / 2);
     C.blk(right - 0.04, za, right + 0.04, gap0);
@@ -405,21 +478,21 @@ function commonWetArea(C) {
 
   // 便器は座面・ふた・タンクを分け、入口から用途が分かる形にする。
   const toilet = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.29, 0.35, 16), mats.porcelain);
-  toilet.scale.z = 1.3; toilet.position.set(left + 0.48, 0.22, z0 - 0.78); C.g.add(toilet);
-  C.pb(0.5, 0.08, 0.58, mats.porcelain, left + 0.48, 0.43, z0 - 0.78);
-  C.pb(0.46, 0.65, 0.22, mats.porcelain, left + 0.48, 0.33, z0 - 0.39);
-  C.blk(left + 0.18, z0 - 1.12, left + 0.78, z0 - 0.3);
+  toilet.scale.z = 1.3; toilet.position.set(left + 0.58, 0.22, z0 - 0.88); C.g.add(toilet);
+  C.pb(0.5, 0.08, 0.58, mats.porcelain, left + 0.58, 0.43, z0 - 0.88);
+  C.pb(0.46, 0.65, 0.22, mats.porcelain, left + 0.58, 0.33, z0 - 0.49);
+  C.blk(left + 0.28, z0 - 1.22, left + 0.88, z0 - 0.4);
 
   // 狭いトイレほど鏡の中の奥行きが不自然に見えるため、便器の横に縦長の鏡を置く。
-  addWetMirror(C, left + 0.035, 1.38, z0 - 0.82, Math.PI / 2, 0.42, 0.72, "トイレの鏡を覗く");
+  addWetMirror(C, left + 0.035, 1.38, z0 - 0.94, Math.PI / 2, 0.52, 0.78, "トイレの鏡を覗く");
   const toiletStain = plane(0.58, 0.72, mats.damp);
   toiletStain.rotation.x = -Math.PI / 2;
-  toiletStain.position.set(left + 0.5, 0.068, z0 - 0.82);
+  toiletStain.position.set(left + 0.6, 0.068, z0 - 0.92);
   C.g.add(toiletStain);
 
   // 浴槽は縁と底を別にして、実際に中へ踏み込める洗い場を手前へ確保する。
-  const tubZ = z0 - 2.48;
-  const tubW = 0.72, tubD = 0.76, tubX = left + 0.43;
+  const tubZ = z0 - 3.02;
+  const tubW = 0.9, tubD = 0.94, tubX = left + 0.55;
   // 浴槽が戸口まで張り出すとプレイヤー半径を含めた通路が消えるため、小型の深い浴槽を左奥へ寄せる。
   C.pb(tubW, 0.5, 0.08, mats.porcelain, tubX, 0.25, tubZ - tubD / 2);
   C.pb(0.08, 0.5, tubD, mats.porcelain, tubX - tubW / 2, 0.25, tubZ);
@@ -429,27 +502,27 @@ function commonWetArea(C) {
   C.blk(tubX - tubW / 2 - 0.04, tubZ - tubD / 2 - 0.04, tubX + tubW / 2 + 0.04, tubZ + tubD / 2 + 0.04);
 
   // 浴室の鏡は洗い場から正面に見える位置へ置き、見続けたときだけ人影を出す。
-  addWetMirror(C, left + 0.035, 1.35, z0 - 2.02, Math.PI / 2, 0.52, 0.68, "風呂の鏡を覗く");
+  addWetMirror(C, left + 0.035, 1.35, z0 - 2.35, Math.PI / 2, 0.62, 0.76, "風呂の鏡を覗く");
   const drain = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.012, 16), mats.drain);
-  drain.position.set(right - 0.28, 0.075, z0 - 1.87); C.g.add(drain);
+  drain.position.set(right - 0.34, 0.075, z0 - 2.35); C.g.add(drain);
   // 太い立体線は虫の脚に見えたため、濡れた束と細い毛を一枚の床デカールで表現する。
   const hair = plane(0.92, 0.92, mats.wetHair);
   hair.rotation.x = -Math.PI / 2;
   hair.rotation.z = -0.28;
-  hair.position.set(right - 0.28, 0.088, z0 - 1.87);
+  hair.position.set(right - 0.34, 0.088, z0 - 2.35);
   C.g.add(hair);
 
   // 右壁を共通の台所にし、部屋の種類にかかわらず流しと冷蔵庫を持たせる。
   // 冷蔵庫と流しの背面だけを古いタイルにし、居室の壁紙へ水汚れが唐突に続かないよう区切る。
-  C.wall(2.72, 1.82, mats.kitchenWall, x1 - 0.025, 1.03, z0 - 1.5, -Math.PI / 2);
-  C.pb(1.45, 0.82, 0.48, mats.kitchenSteel, x1 - 0.86, 0.41, z0 - 1.03);
-  C.blk(x1 - 1.62, z0 - 1.31, x1 - 0.1, z0 - 0.75);
+  C.wall(3.35, 1.82, mats.kitchenWall, x1 - 0.025, 1.03, z0 - 1.82, -Math.PI / 2);
+  C.pb(1.55, 0.82, 0.5, mats.kitchenSteel, x1 - 0.96, 0.41, z0 - 1.08);
+  C.blk(x1 - 1.78, z0 - 1.37, x1 - 0.1, z0 - 0.79);
   const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.035, 16), mats.darksteel);
-  sink.scale.z = 1.35; sink.position.set(x1 - 0.88, 0.84, z0 - 1.03); C.g.add(sink);
+  sink.scale.z = 1.35; sink.position.set(x1 - 0.98, 0.84, z0 - 1.08); C.g.add(sink);
   // 吊り戸棚は部屋別に置くとトイレへ重なるため、共通の流しの真上だけに固定する。
-  const upper = C.pb(1.35, 0.55, 0.3, mats.wood, x1 - 0.86, 1.73, z0 - 0.86);
+  const upper = C.pb(1.45, 0.55, 0.3, mats.wood, x1 - 0.96, 1.73, z0 - 0.91);
   upper.userData.kind = "kitchenUpper";
-  buildFridge(C, x1 - 0.48, z0 - 2.25);
+  buildFridge(C, x1 - 0.55, z0 - 2.75);
 }
 
 function addWetMirror(C, px, py, pz, ry, w, h, label) {
@@ -466,34 +539,40 @@ function addWetMirror(C, px, py, pz, ry, w, h, label) {
 
 function buildFridge(C, px, pz) {
   const { mats } = C;
-  const w = 0.68, h = 1.48, d = 0.62, t = 0.055;
+  const w = 0.78, h = 1.65, d = 0.68, t = 0.055;
   const front = pz + d / 2;
   // 中身まで詰まった直方体では扉を開けても正面が塞がるため、外板を組んで空洞を作る。
   C.pb(w, t, d, mats.appliance, px, t / 2, pz);
   C.pb(w, t, d, mats.appliance, px, h - t / 2, pz);
   C.pb(t, h, d, mats.appliance, px - w / 2 + t / 2, h / 2, pz);
   C.pb(t, h, d, mats.appliance, px + w / 2 - t / 2, h / 2, pz);
-  C.pb(w - t * 2, h - t * 2, t, mats.fridgeInside, px, h / 2, pz - d / 2 + t / 2);
   C.blk(px - w / 2 - 0.02, pz - d / 2 - 0.02, px + w / 2 + 0.02, pz + d / 2 + 0.02);
 
   const inside = new THREE.Group();
-  // 棚を扉と別にしておくと、開いた瞬間に冷蔵庫の奥行きと向きが読み取れる。
-  for (const y of [0.43, 0.82, 1.17]) {
-    const shelf = box(w - 0.14, 0.025, d - 0.13, mats.fridgeInside);
-    shelf.position.set(px, y, pz + 0.015); inside.add(shelf);
+  // 食品入りの生成画像を奥板へ貼り、棚板も重ねて写真だけに見えない実奥行きを作る。
+  const cavity = plane(w - 0.12, h - 0.14, mats.fridgeInterior);
+  cavity.position.set(px, h / 2, pz - d / 2 + t + 0.008); inside.add(cavity);
+  for (const y of [0.45, 0.84, 1.23]) {
+    const shelf = box(w - 0.13, 0.026, d - 0.12, mats.fridgeShelf);
+    shelf.position.set(px, y, pz + 0.01); inside.add(shelf);
   }
   inside.visible = false; C.g.add(inside);
 
+  // 右蝶番に変えると、開いた扉の内側が部屋の中央を向き、収納画像を正面から確認できる。
   const pivot = new THREE.Group();
-  pivot.position.set(px - w / 2, 0, front + 0.018);
+  pivot.position.set(px + w / 2, 0, front + 0.018);
   const door = box(w, h - 0.06, 0.055, mats.fridgeDoor);
-  door.position.set(w / 2, h / 2, 0); pivot.add(door);
+  door.position.set(-w / 2, h / 2, 0); pivot.add(door);
+  const doorInner = plane(w - 0.08, h - 0.13, mats.fridgeDoorInside);
+  doorInner.position.set(-w / 2, h / 2, -0.031);
+  doorInner.rotation.y = Math.PI;
+  pivot.add(doorInner);
   const handle = box(0.035, 0.55, 0.04, mats.darksteel);
-  handle.position.set(w - 0.09, 0.86, 0.045); pivot.add(handle); C.g.add(pivot);
+  handle.position.set(-w + 0.09, 0.93, 0.045); pivot.add(handle); C.g.add(pivot);
   pivot.userData.kind = "fridgeDoor";
   C.inter.push({ x: px, y: 1.0, z: pz + 0.7, r: 1.2, kind: "detail", label: "冷蔵庫を開ける",
     say: "電気は止まっているのに、中が冷えている。", scare: "fridge", repeat: true,
-    fixture: { pivot, inside, open: false, opened: -Math.PI * 0.58 } });
+    fixture: { pivot, inside, open: false, opened: Math.PI * 0.52 } });
 }
 
 function buildItemProp(C, id, px, pz) {
@@ -1187,6 +1266,11 @@ export function buildFloor(scene, floorDef, opt) {
     curtain: lam({ color: 0x6e6656 }),
     generatedWindow: new THREE.MeshBasicMaterial({ map: generatedWindow }),
     generatedCurtain: new THREE.MeshBasicMaterial({ map: generatedCurtain, transparent: true, depthWrite: false }),
+    // 写実素材を標準材質へ貼り、照明と視点に応じて明暗が変わる立体物として見せる。
+    clutter: Array.from({ length: 6 }, (_, i) => new THREE.MeshStandardMaterial({ map: livedInTexture(i), transparent: true, alphaTest: 0.04, roughness: 0.82, metalness: 0.03, side: THREE.DoubleSide })),
+    fridgeInterior: new THREE.MeshBasicMaterial({ map: fridgeInterior }),
+    fridgeDoorInside: new THREE.MeshBasicMaterial({ map: fridgeDoorInside, side: THREE.FrontSide }),
+    fridgeShelf: new THREE.MeshStandardMaterial({ color: 0x6d7777, transparent: true, opacity: 0.55, roughness: 0.28, metalness: 0.35 }),
     newspaper: lam({ color: 0xbdb49c }),
     frostglass: lam({ color: 0x8f9aa0 }),
     entryFloor: lam({ map: roomSurfaceTexture(0, 0), color: 0xaaa18b }),

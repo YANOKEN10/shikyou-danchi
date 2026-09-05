@@ -226,7 +226,8 @@ export class Haunts {
   // 便器の位置は全住戸で共通なので、陶器の内側から頭だけをゆっくり上げる。
   _toiletVisitor() {
     const b = this.g.curRoom.unitBounds;
-    const a = this._apparition(APPARITION_MAPS.toilet, 0.58, 0.72, b.x0 + 0.6, 0.31, b.z0 - 0.78);
+    // 広げた便所の便器中央へ合わせ、怪異だけが以前の位置に浮くずれを防ぐ。
+    const a = this._apparition(APPARITION_MAPS.toilet, 0.58, 0.72, b.x0 + 0.7, 0.31, b.z0 - 0.88);
     this._fadeApparition("toiletVisitor", a.mesh, a.mat, 7.2, 0.96, 0.34);
   }
 
