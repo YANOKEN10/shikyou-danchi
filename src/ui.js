@@ -261,6 +261,9 @@ export class UI {
     return new Promise((resolve) => {
       const root = document.createElement("div"); root.className = "endcinematic";
       const canvas = document.createElement("canvas");
+      const exterior = new Image();
+      exterior.decoding = "async";
+      exterior.src = "./assets/generated/ending-exterior-dawn-v1.png?v=20260905";
       const caption = document.createElement("div"); caption.className = "endcaption";
       const skip = document.createElement("button"); skip.className = "endskip"; skip.textContent = "先へ";
       root.append(canvas, caption, skip); this.el.ending.appendChild(root);
@@ -321,6 +324,28 @@ export class UI {
         }
       };
 
+      // 生成した実景を画面いっぱいに切り抜き、わずかな前進と横振りで静止画にもカメラ移動を与える。
+      // 読み込みが間に合わない瞬間だけ従来のCanvas景色を使い、黒画面で演出を止めない。
+      const drawExterior = (time, p, dawn) => {
+        if (!exterior.complete || !exterior.naturalWidth) {
+          drawSkyAndStreet(time, dawn);
+          return;
+        }
+        const iw = exterior.naturalWidth, ih = exterior.naturalHeight;
+        const cover = Math.max(w / iw, h / ih);
+        const zoom = cover * (1.105 - ease(p) * 0.055);
+        const sw = w / zoom, sh = h / zoom;
+        const travel = ease(Math.max(0, (p - 0.18) / 0.82));
+        const sx = Math.max(0, Math.min(iw - sw, (iw - sw) * (0.42 + travel * 0.13)));
+        const sy = Math.max(0, Math.min(ih - sh, (ih - sh) * (0.48 - travel * 0.08)));
+        ctx.drawImage(exterior, sx, sy, sw, sh, 0, 0, w, h);
+        const shade = ctx.createLinearGradient(0, 0, 0, h);
+        shade.addColorStop(0, `rgba(2,7,13,${0.28 - dawn * 0.12})`);
+        shade.addColorStop(0.7, `rgba(2,4,7,${0.12 - dawn * 0.05})`);
+        shade.addColorStop(1, "rgba(0,0,0,.34)");
+        ctx.fillStyle = shade; ctx.fillRect(0, 0, w, h);
+      };
+
       const drawBuilding = (p, alpha) => {
         const scale = 1.18 - ease(p) * 0.35;
         const bw = Math.min(w * 0.78, 760) * scale, bh = h * 0.64 * scale;
@@ -359,7 +384,7 @@ export class UI {
       const frame = (now) => {
         const elapsed = now - started, p = Math.min(1, elapsed / duration), time = elapsed / 1000;
         const dawn = ease(Math.max(0, (p - 0.16) / 0.84));
-        ctx.clearRect(0, 0, w, h); drawSkyAndStreet(time, dawn);
+        ctx.clearRect(0, 0, w, h); drawExterior(time, p, dawn);
         if (p < 0.43) {
           const open = ease(Math.min(1, p / 0.24));
           const side = w * (0.48 - open * 0.43);
@@ -369,7 +394,14 @@ export class UI {
         } else {
           const turn = ease(Math.min(1, (p - 0.43) / 0.2));
           ctx.fillStyle = `rgba(1,2,4,${Math.sin(turn * Math.PI) * 0.82})`; ctx.fillRect(0, 0, w, h);
-          drawBuilding((p - 0.43) / 0.57, turn);
+          // 真エンドだけ建物の玄関に母の影を一瞬残し、背景写真へ描き足す怪異を控えめにする。
+          if (ending.best && p > 0.56 && p < 0.81) {
+            const a = Math.min(1, (p - 0.56) / 0.08) * Math.min(1, (0.81 - p) / 0.1);
+            ctx.save(); ctx.globalAlpha = Math.max(0, a) * 0.58; ctx.fillStyle = "#010203";
+            ctx.beginPath(); ctx.ellipse(w * 0.79, h * 0.78, h * 0.025, h * 0.12, 0.04, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(w * 0.79, h * 0.645, h * 0.021, h * 0.036, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+          }
         }
         if (p < 0.38) setCaption("夜明け前　四号棟を出る");
         else if (p < 0.74) setCaption(ending.best ? "足音は、敷居の内側で止まった。" : "背後で、足音が止まった。");
