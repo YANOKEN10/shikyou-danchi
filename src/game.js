@@ -1001,9 +1001,14 @@ export class Game {
     }
 
     if (it.kind === "down") {
-      if (this.state.floor === 1 && this.state.flags.hasNotebook) { await this._escape(); return; }
-      if (this.state.floor === 1) { this.ui.sayNow("……まだ帰れない。"); return; }
       await this._goDown();
+      return;
+    }
+
+    if (it.kind === "exit") {
+      if (this.state.flags.hasNotebook) { await this._escape(); return; }
+      this.snd.locked();
+      this.ui.sayNow("……まだ帰れない。");
       return;
     }
   }

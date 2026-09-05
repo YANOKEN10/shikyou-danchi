@@ -4,3 +4,5 @@ serve.js
 *.zip
 .env*
 shots
+.chrome-*
+local-*.png

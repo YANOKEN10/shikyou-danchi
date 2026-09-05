@@ -566,6 +566,9 @@ export function currentGoal(state) {
   const floor = state.floor | 0;
 
   if (floor === 1) {
+    if (f.hasNotebook) {
+      return { now: "外へ出る", lines: ["階段室の外扉を調べ、団地の外へ出ます。"] };
+    }
     if (!has("light")) {
       return {
         now: "懐中電灯を拾う",

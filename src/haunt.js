@@ -241,7 +241,10 @@ export class Haunts {
   // 奥の窓に子どもの影を置き、近づいて確かめきる前に消す。
   _windowChild() {
     const g = this.g, b = g.curRoom.unitBounds;
-    const a = this._apparition(APPARITION_MAPS.window, 0.86, 1.32, g.curRoom.dx, 1.27, b.z1 + 0.055);
+    const w = b.window || { x: g.curRoom.dx, y: 1.43, z: b.z1 + 0.075, ghostW: 0.50, ghostH: 0.82 };
+    // 窓の内寸より必ず小さくし、カーテンの中央の隙間から全身が見える位置へ固定する。
+    const a = this._apparition(APPARITION_MAPS.window, w.ghostW, w.ghostH, w.x, w.y, w.z);
+    a.mesh.renderOrder = 10;
     let noticed = false;
     this._add({
       kind: "windowChild", life: 10,

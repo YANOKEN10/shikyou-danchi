@@ -63,6 +63,8 @@ const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v
 const generatedMirrorGhost = generatedTexture("./assets/generated/mirror-ghost-v2.png?v=20260901");
 const roomSurfacesAtlas = generatedTexture("./assets/generated/room-surfaces-atlas-v1.png?v=20260901");
 const butsudanAtlas = generatedTexture("./assets/generated/butsudan-atlas-v1.png?v=20260901");
+const generatedWindow = generatedTexture("./assets/generated/window-night-v1.png?v=20260905");
+const generatedCurtain = generatedTexture("./assets/generated/curtain-decay-v1.png?v=20260905");
 
 // 一枚の生成画像を六つの素材へ切り分け、通信量を増やさず家具ごとの質感を変える。
 function interiorTexture(col, row) {
@@ -219,17 +221,16 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
     col.add(px - w / 2, zMid - 0.06, px + w / 2, zMid + 0.06, "unit");
   });
 
-  // 奥の窓。部屋によって、カーテン・目張り・そのまま
-  const win = plane(1.6, 1.1, mats.night);
+  // 生成画像を一枚の窓として使い、枠と夜景が別々に浮いて見えるのを防ぐ。
+  const win = plane(1.72, 0.97, mats.generatedWindow);
   put(g, win, dx, 1.45, z1 + 0.03);
-  put(g, box(1.72, 0.06, 0.06, mats.steel), dx, 2.02, z1 + 0.06);
-  put(g, box(0.06, 1.16, 0.06, mats.steel), dx, 1.45, z1 + 0.06);
 
   const style = (unit.no || 0) % 3;
   if (style === 1) {
-    // カーテン（片方だけ開いている）
-    put(g, box(0.55, 1.25, 0.05, mats.curtain), dx - 0.62, 1.42, z1 + 0.10);
-    put(g, box(0.28, 1.25, 0.05, mats.curtain), dx + 0.72, 1.42, z1 + 0.10);
+    // 中央が透過した一枚絵にして、布の継ぎ目を消しつつ窓の怪異を隠さない。
+    const curtain = plane(1.9, 1.28, mats.generatedCurtain);
+    curtain.renderOrder = 11;
+    put(g, curtain, dx, 1.43, z1 + 0.10);
     put(g, box(1.9, 0.04, 0.04, mats.steel), dx, 2.08, z1 + 0.10);
   } else if (style === 2) {
     // 内側から新聞紙で目張りしてある
@@ -304,7 +305,11 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
     });
   }
 
-  return { x0, x1, z0, z1, dx };
+  // 怪異側にも実際の窓の内寸を渡し、人物画像が枠や腰壁からはみ出さないようにする。
+  return {
+    x0, x1, z0, z1, dx,
+    window: { x: dx, y: 1.43, z: z1 + 0.075, ghostW: style === 1 ? 0.50 : 0.62, ghostH: 0.82 },
+  };
 }
 
 /* ---------- どの部屋にもあるもの ---------- */
@@ -968,7 +973,7 @@ function addGhost(C, mirror, px, py, pz, ry, w, h) {
 
 /* ---------- 階段室 ---------- */
 
-function buildStair(g, col, inter, floorDef, mats, canDown) {
+function buildStair(g, col, inter, floorDef, mats, canExit) {
   const { STAIR_X0: x0, STAIR_X1: x1, STAIR_Z0: z0, STAIR_Z1: z1 } = D;
   const H = 2.9;
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -1017,19 +1022,30 @@ function buildStair(g, col, inter, floorDef, mats, canDown) {
   upRail.rotation.z = Math.atan2(rise * steps, SX1 - SX0);
   put(g, upRail, (SX0 + SX1) / 2, 0.95 + (rise * steps) / 2, upZ1 + 0.06);
 
-  // 下りの段（-x へ向かって下がる。穴は黒く塗って、奥行きを出します）
-  const hole = plane(SX1 - SX0, dnZ1 - dnZ0, mats.blackhole);
-  hole.rotation.x = -Math.PI / 2;
-  put(g, hole, (SX0 + SX1) / 2, 0.015, (dnZ0 + dnZ1) / 2);
-  for (let i = 0; i < 4; i++) {
-    const y = -rise * i;
-    const x = SX1 - 0.15 - i * run;
-    put(g, box(run, 0.05, dnZ1 - dnZ0, mats.fstair), x, y - 0.025, (dnZ0 + dnZ1) / 2);
+  if (floorDef.n > 1) {
+    // 二階以上だけに下降階段を作り、一階の下に存在しない空間を見せない。
+    const hole = plane(SX1 - SX0, dnZ1 - dnZ0, mats.blackhole);
+    hole.rotation.x = -Math.PI / 2;
+    put(g, hole, (SX0 + SX1) / 2, 0.015, (dnZ0 + dnZ1) / 2);
+    for (let i = 0; i < 4; i++) {
+      const y = -rise * i;
+      const x = SX1 - 0.15 - i * run;
+      put(g, box(run, 0.05, dnZ1 - dnZ0, mats.fstair), x, y - 0.025, (dnZ0 + dnZ1) / 2);
+    }
+    col.add(SX0, dnZ0, SX1, dnZ1 + 0.1, "stair");
+    const dnRail = box((SX1 - SX0) * 1.02, 0.05, 0.05, mats.steel);
+    put(g, dnRail, (SX0 + SX1) / 2, 0.98, dnZ0 - 0.06);
+    put(g, box(0.05, 0.98, 0.05, mats.steel), SX1, 0.49, dnZ0 - 0.06);
+  } else {
+    // 一階の下降階段の代わりに外扉を置き、帰還の目的地を見た目でも分かるようにする。
+    const exitDoor = box(0.09, 2.08, 1.08, mats.darksteel);
+    put(g, exitDoor, x0 + 0.05, 1.04, (dnZ0 + dnZ1) / 2);
+    put(g, box(0.05, 0.07, 0.07, mats.steel), x0 + 0.13, 1.02, (dnZ0 + dnZ1) / 2 - 0.34);
+    inter.push({
+      x: x0 + 0.82, y: 1.05, z: (dnZ0 + dnZ1) / 2, r: 1.35,
+      kind: "exit", label: canExit ? "外へ出る" : "調べる",
+    });
   }
-  col.add(SX0, dnZ0, SX1, dnZ1 + 0.1, "stair");
-  const dnRail = box((SX1 - SX0) * 1.02, 0.05, 0.05, mats.steel);
-  put(g, dnRail, (SX0 + SX1) / 2, 0.98, dnZ0 - 0.06);
-  put(g, box(0.05, 0.98, 0.05, mats.steel), SX1, 0.49, dnZ0 - 0.06);
 
   // 階数のプレート（廊下から入って、正面に見える位置）
   const pl = plane(0.5, 0.5, new THREE.MeshLambertMaterial({ map: TX.floorPlate(floorDef.n) }));
@@ -1053,7 +1069,7 @@ function buildStair(g, col, inter, floorDef, mats, canDown) {
     x: (SX0 + SX1) / 2 + 0.6, y: 1.0, z: upZ1 + 0.15, r: 1.7,
     kind: "up", label: "上る",
   });
-  if (canDown) {
+  if (floorDef.n > 1) {
     inter.push({
       x: (SX0 + SX1) / 2 + 0.6, y: 1.0, z: dnZ0 - 0.15, r: 1.7,
       kind: "down", label: "下りる",
@@ -1169,6 +1185,8 @@ export function buildFloor(scene, floorDef, opt) {
     plate: lam({ color: 0xd8d4c8 }),
     frame: lam({ color: 0x5a4530 }),
     curtain: lam({ color: 0x6e6656 }),
+    generatedWindow: new THREE.MeshBasicMaterial({ map: generatedWindow }),
+    generatedCurtain: new THREE.MeshBasicMaterial({ map: generatedCurtain, transparent: true, depthWrite: false }),
     newspaper: lam({ color: 0xbdb49c }),
     frostglass: lam({ color: 0x8f9aa0 }),
     entryFloor: lam({ map: roomSurfaceTexture(0, 0), color: 0xaaa18b }),
@@ -1364,7 +1382,7 @@ export function buildFloor(scene, floorDef, opt) {
   }
 
   /* --- 階段室 --- */
-  const stair = buildStair(g, col, inter, floorDef, mats, floorDef.n > 1 || o.canExit);
+  const stair = buildStair(g, col, inter, floorDef, mats, Boolean(o.canExit));
 
   /* --- 空気（霧と弱い環境光） --- */
   return {

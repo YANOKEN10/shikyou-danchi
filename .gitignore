@@ -5,6 +5,8 @@ node_modules/
 *.zip
 .claude/
 shots/
+.chrome-*/
+local-*.png
 
 .vercel
 .env*
