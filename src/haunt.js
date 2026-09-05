@@ -272,7 +272,8 @@ export class Haunts {
     mesh.lookAt(g.camera.position.x, mesh.position.y, g.camera.position.z);
     mesh.renderOrder = 30;
     g.floor.group.add(mesh);
-    g.snd.stinger("close"); g.ui.hit();
+    // 顔面いっぱいの出現は視覚だけで成立するため、同時に鳴っていた合成スタッカートを外す。
+    g.ui.hit();
     this._add({
       kind: "cameraVisitor", life: 1.55,
       step: (e) => {

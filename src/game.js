@@ -760,7 +760,8 @@ export class Game {
       // 顔そのものが模型の中心より前へ張り出すため、中心を少し離しても表面は旧版より近く見える。
       if (this._showApparition(x, z, 4.2,
         { mode: "approach", speed: 0.16, stopDistance: 0.40, scale: 1.55, pose: "lean" })) {
-        this.snd.stinger("close"); this.ui.hit();
+        // 出現と同時の作り物めいた効果音は鳴らさず、目の前にいる事実そのものを驚きにする。
+        this.ui.hit();
         this.apparCooldown = 28 + Math.random() * 24;
       }
       this.turnLook = 0;
@@ -779,7 +780,7 @@ export class Game {
             // 短い飛び出しは添付参考のように背景がほぼ消える距離で顔を見せる。
             shown = this._showApparition(p.x + f.x * 0.48, p.z + f.z * 0.48, 1.45,
               { mode: "approach", speed: 0.9, stopDistance: 0.40, scale: 1.55, pose: "lean" });
-            if (shown) { this.snd.stinger("close"); this.ui.hit(); }
+            if (shown) this.ui.hit();
           } else if (roll < 0.72) {
             const x = Math.max(0.9, Math.min(this.floor.len - 0.9, p.x + f.x * 3.8));
             shown = this._showApparition(x, p.z + f.z * 3.2, 4.8, { mode: "approach", speed: 0.38 });
