@@ -33,7 +33,7 @@ export const FLOORS = [
     stairHint: "",
     units: [
       { no: 101, enter: true, item: "light", note: "自分の家だったころ、傘立ての上に置いていた。" },
-      { no: 102, enter: true },
+      { no: 102, enter: true, item: "spareLight", note: "使える電池の入った予備の懐中電灯だ。" },
       { no: 103, enter: true },
       { no: 104, enter: true },
       { no: 105, enter: true },
@@ -453,6 +453,7 @@ export const MEMO_ORDER = ["m1", "m2", "m3draft", "m3", "m4", "m5", "m6"];
 
 export const ITEMS = {
   light: { name: "懐中電灯", say: "懐中電灯。電池はもう長くない。" },
+  spareLight: { name: "予備の懐中電灯", say: "電池の入った懐中電灯に持ち替えた。" },
   battery: { name: "予備の電池", say: "電池を一本、見つけた。" },
   key3: { name: "階段の鍵", say: "階段の鍵。南京錠のものだ。" },
 };

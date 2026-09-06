@@ -562,7 +562,7 @@ function buildFridge(C, px, pz) {
 
 function buildItemProp(C, id, px, pz) {
   const g = new THREE.Group();
-  if (id === "light") {
+  if (id === "light" || id === "spareLight") {
     // 暗い靴箱の上でも輪郭が沈まないよう、実寸より少し大きくし銀色の節を足す。
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.34, 16), C.mats.darksteel);
     body.rotation.x = Math.PI / 2; g.add(body);
@@ -593,6 +593,15 @@ function buildItemProp(C, id, px, pz) {
   return g;
 }
 
+// 入れる住戸の玄関側の床に置き、家具の生成や取得済みアイテムの復活を起こさない。
+export function addEmergencyBattery(floor, room) {
+  const x = room.dx + 0.42, z = -1.05;
+  const prop = buildItemProp({ g: floor.group, mats: floor.mats }, "battery", x, z);
+  prop.position.y = 0.08;
+  prop.scale.setScalar(1.8);
+  floor.inter.push({ kind: "item", id: "battery", emergency: true, roomNo: room.no,
+    x, y: 0.08, z, r: 1.35, label: "交換用の電池を取る", prop });
+}
 function buildMemoProp(C, id, px, pz) {
   const g = new THREE.Group();
   const isLetter = id === "m5" || id === "m3draft";

@@ -117,6 +117,9 @@ export class Game {
     // ほとんど見えないくらいの環境光。暗さがこのゲームの本体です
     this.amb = new THREE.HemisphereLight(0x1b2230, 0x05070a, 0.30);
     this.scene.add(this.amb);
+    // 電灯とは独立した補助環境光で、消灯した住戸でも床・家具・壁の形を読めるようにする。
+    this.roomVisibility = new THREE.HemisphereLight(0xc1cad6, 0x85817a, 0);
+    this.scene.add(this.roomVisibility);
 
     // 懐中電灯
     this.torch = new THREE.SpotLight(0xffeec8, 0, 26, 0.44, 0.5, 1.5);
@@ -316,6 +319,17 @@ export class Game {
     if (def.stairHint && this._stairBlocked()) this.ui.say(def.stairHint);
   }
 
+  _ensureEmergencyBattery() {
+    const p = this.player, f = this.floor;
+    if (this.versus || !f || !p.hasLight || p.battery > 0.001 || p.spare > 0) return;
+    if (f.inter.some(it => it.emergency && !it.done)) return;
+    const rooms = f.doors.filter(d => d.canEnter);
+    if (!rooms.length) return;
+    const room = rooms[Math.floor(Math.random() * rooms.length)];
+    B.addEmergencyBattery(f, room);
+    this.ui.say("この階のどこかの部屋に、交換用の電池がある。部屋の中を探そう。");
+  }
+
   _stairBlocked() {
     const d = this.def;
     if (!d.stairLocked) return false;
@@ -357,6 +371,8 @@ export class Game {
     // 住戸の出入り
     const rec = this._insideUnit();
     p.inUnit = Boolean(rec);
+    this.roomVisibility.intensity += ((rec ? 1.55 : 0) - this.roomVisibility.intensity) * Math.min(1, dt * 5);
+    this._ensureEmergencyBattery();
     if (rec !== this.curRoom) {
       if (this.curRoom) this._roomExit();
       this.curRoom = rec;
@@ -862,7 +878,7 @@ export class Game {
         d.build();
         // 住戸は扉を開けた時に生成されるため、保存済みの持ち物は生成直後に隠さないと再び置かれて見える。
         this.floor.inter.slice(firstNew).forEach((entry) => {
-          if (entry.kind === "item" && this.state.items[entry.id]) {
+          if (entry.kind === "item" && !entry.emergency && this.state.items[entry.id]) {
             entry.done = true;
             if (entry.prop) entry.prop.visible = false;
           }
@@ -955,7 +971,9 @@ export class Game {
       } else {
         this.state.items[it.id] = true;
       }
-      if (it.id === "light") {
+      if (it.id === "light" || it.id === "spareLight") {
+        this.state.items.light = true;
+        if (it.id === "spareLight") p.battery = 1;
         p.hasLight = true;
         p.lightOn = true;
         this.snd.click();
