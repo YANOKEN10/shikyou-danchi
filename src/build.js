@@ -55,7 +55,7 @@ function generatedTexture(path, rx = 1, ry = 1) {
   tex.repeat.set(rx, ry);
   return tex;
 }
-const generatedWall = generatedTexture("./assets/generated/wall-aged.webp", 2, 1);
+const generatedWall = generatedTexture("./assets/generated/wall-plaster-v2.png?v=20260906", 2, 1);
 const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 2, 2);
 const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-v2.png?v=20260830");
 const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v1.png?v=20260831");
@@ -64,7 +64,6 @@ const generatedMirrorGhost = generatedTexture("./assets/generated/mirror-ghost-v
 const roomSurfacesAtlas = generatedTexture("./assets/generated/room-surfaces-atlas-v1.png?v=20260901");
 const butsudanAtlas = generatedTexture("./assets/generated/butsudan-atlas-v1.png?v=20260901");
 const generatedWindow = generatedTexture("./assets/generated/window-night-v1.png?v=20260905");
-const generatedCurtain = generatedTexture("./assets/generated/curtain-decay-v1.png?v=20260905");
 const livedInAtlas = generatedTexture("./assets/generated/lived-in-clutter-atlas-v1.png?v=20260905");
 const fridgeInterior = generatedTexture("./assets/generated/fridge-interior-v1.png?v=20260905");
 const fridgeDoorInside = generatedTexture("./assets/generated/fridge-door-inside-v1.png?v=20260905");
@@ -238,22 +237,8 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   const win = plane(1.72, 0.97, mats.generatedWindow);
   put(g, win, dx, 1.45, z1 + 0.03);
 
-  const style = (unit.no || 0) % 3;
-  if (style === 1) {
-    // 中央が透過した一枚絵にして、布の継ぎ目を消しつつ窓の怪異を隠さない。
-    const curtain = plane(1.9, 1.28, mats.generatedCurtain);
-    curtain.renderOrder = 11;
-    put(g, curtain, dx, 1.43, z1 + 0.10);
-    put(g, box(1.9, 0.04, 0.04, mats.steel), dx, 2.08, z1 + 0.10);
-  } else if (style === 2) {
-    // 内側から新聞紙で目張りしてある
-    for (let i = 0; i < 4; i++) {
-      const p = box(0.46, 0.62, 0.02, mats.newspaper);
-      p.position.set(dx - 0.58 + (i % 2) * 0.78, 1.72 - Math.floor(i / 2) * 0.56, z1 + 0.09);
-      p.rotation.z = (Math.random() - 0.5) * 0.09;
-      g.add(p);
-    }
-  }
+  const style = (unit.no || 0) % 3; // 部屋ごとの怪異の違いは保つ。
+  // 窓の前には覆いを置かず、窓枠と夜景がそのまま見えるようにする。
 
   /* --- 家財 --- */
   const C = {
@@ -1223,7 +1208,7 @@ export function buildFloor(scene, floorDef, opt) {
     tatami: lam({ map: generatedTatami, color: 0xb3ad91 }),
     tile: lam({ map: TX.tileWall(2, 2) }),
     wood: lam({ map: interiorTexture(2, 0), color: 0xb8a590 }),
-    fusuma: lam({ color: 0xb8ad90 }),
+    fusuma: lam({ map: generatedWall, color: 0xc1b6a3 }),
     notebook: lam({ color: 0x2e3d5c }),
     night: lam({ color: 0x0a1020 }),
     blackhole: new THREE.MeshBasicMaterial({ color: 0x000000 }),
@@ -1263,9 +1248,7 @@ export function buildFloor(scene, floorDef, opt) {
     calendar: lam({ map: TX.calendar() }),
     plate: lam({ color: 0xd8d4c8 }),
     frame: lam({ color: 0x5a4530 }),
-    curtain: lam({ color: 0x6e6656 }),
     generatedWindow: new THREE.MeshBasicMaterial({ map: generatedWindow }),
-    generatedCurtain: new THREE.MeshBasicMaterial({ map: generatedCurtain, transparent: true, depthWrite: false }),
     // 写実素材を標準材質へ貼り、照明と視点に応じて明暗が変わる立体物として見せる。
     clutter: Array.from({ length: 6 }, (_, i) => new THREE.MeshStandardMaterial({ map: livedInTexture(i), transparent: true, alphaTest: 0.04, roughness: 0.82, metalness: 0.03, side: THREE.DoubleSide })),
     fridgeInterior: new THREE.MeshBasicMaterial({ map: fridgeInterior }),
