@@ -183,7 +183,8 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   const z0 = -0.16, z1 = z0 - D.UNIT_D;
   const x0 = dx - D.UNIT_W / 2, x1 = dx + D.UNIT_W / 2;
   const H = 2.3;
-  const zMid = z0 - 3.8;
+  const layout = (unit.no + Math.floor(unit.no / 100)) % 3;
+  const zMid = z0 - [3.8, 4.05, 4.3][layout];
 
   /* --- 床・天井・壁 --- */
   const f1 = plane(D.UNIT_W, z0 - zMid, mats.entryFloor);      // 手前は台所の床
@@ -225,14 +226,13 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   col.add(x0 - 0.1, z0, x0 + sideW, z0 + 0.1, "unit");
   col.add(x1 - sideW, z0, x1 + 0.1, z0 + 0.1, "unit");
 
-  // 襖（通り抜けの穴つき）
-  const pw = (D.UNIT_W - 1.1) / 2;
-  [[x0 + pw / 2, pw], [x1 - pw / 2, pw]].forEach(([px, w]) => {
-    const m = box(w, H, 0.08, mats.fusuma);
-    put(g, m, px, H / 2, zMid);
-    col.add(px - w / 2, zMid - 0.06, px + w / 2, zMid + 0.06, "unit");
+  // 住戸ごとに台所の奥行きと通り口を変え、中央には歩行幅を残す。
+  const opening = dx + [-0.05, 0.25, 0.5][layout], halfGap = 0.7;
+  [[x0, opening - halfGap], [opening + halfGap, x1]].forEach(([a, b]) => {
+    const m = box(b - a, H, 0.08, mats.fusuma);
+    put(g, m, (a + b) / 2, H / 2, zMid);
+    col.add(a, zMid - 0.06, b, zMid + 0.06, "unit");
   });
-
   // 生成画像を一枚の窓として使い、枠と夜景が別々に浮いて見えるのを防ぐ。
   const win = plane(1.72, 0.97, mats.generatedWindow);
   put(g, win, dx, 1.45, z1 + 0.03);
@@ -242,7 +242,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
 
   /* --- 家財 --- */
   const C = {
-    g, col, inter, fx, mats, dx, x0, x1, z0, z1, zMid, H, room, unit,
+    g, col, inter, fx, mats, dx, x0, x1, z0, z1, zMid, H, room, unit, layout,
     pb(w, h, d, mat, px, py, pz, ry) {
       const m = box(w, h, d, mat);
       m.position.set(px, py, pz);
@@ -292,6 +292,8 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
     });
   }
 
+  furnishHome(C);
+
   // 部屋ごとの「調べる」
   if (room.detail) {
     inter.push({
@@ -306,7 +308,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
 
   // 怪異側にも実際の窓の内寸を渡し、人物画像が枠や腰壁からはみ出さないようにする。
   return {
-    x0, x1, z0, z1, dx,
+    x0, x1, z0, z1, dx, layout, zMid, opening,
     window: { x: dx, y: 1.43, z: z1 + 0.075, ghostW: style === 1 ? 0.50 : 0.62, ghostH: 0.82 },
   };
 }
@@ -507,7 +509,7 @@ function commonWetArea(C) {
   // 吊り戸棚は部屋別に置くとトイレへ重なるため、共通の流しの真上だけに固定する。
   const upper = C.pb(1.45, 0.55, 0.3, mats.wood, x1 - 0.96, 1.73, z0 - 0.91);
   upper.userData.kind = "kitchenUpper";
-  buildFridge(C, x1 - 0.55, z0 - 2.75);
+  buildFridge(C, x1 - [0.52, 0.9, 0.55][C.layout], z0 - [2.75, 3.0, 3.35][C.layout]);
 }
 
 function addWetMirror(C, px, py, pz, ry, w, h, label) {
@@ -602,6 +604,51 @@ export function addEmergencyBattery(floor, room) {
   floor.inter.push({ kind: "item", id: "battery", emergency: true, roomNo: room.no,
     x, y: 0.08, z, r: 1.35, label: "交換用の電池を取る", prop });
 }
+// 空き家・物置の物語は保ち、生活する部屋には用途に合う家具を足す。
+function furnishHome(C) {
+  const sets = {
+    kitchen: ["dresser"], butsudan: ["dresser", "sideTable"], boxes: ["dresser"],
+    child: ["bed", "desk"], futon: ["dresser", "sideTable"], flowers: ["sideTable", "dresser"],
+    office: ["dresser", "sideTable"], tv: ["bed", "sideTable"], dolls: ["bed", "dresser"],
+    letter: ["desk", "dresser"], home: ["bed", "dresser"], mirrors: ["dresser"], bath: ["sideTable"],
+  };
+  const sizes = {bed:[1.05,1.95], dresser:[1.0,.5], desk:[1.15,.65], sideTable:[.6,.55]};
+  for (const kind of sets[C.room.kind] || []) {
+    const [w,d] = sizes[kind];
+    const candidates = [];
+    for (const side of (C.layout === 1 ? [1,-1] : [-1,1])) {
+      const x = side < 0 ? C.x0 + w/2 + .18 : C.x1 - w/2 - .18;
+      for (let z = C.zMid - d/2 - .5; z > C.z1 + d/2 + .15; z -= .25) candidates.push([x,z]);
+    }
+    const at = candidates.find(([x,z]) => {
+      const a=x-w/2-.12,b=x+w/2+.12,c=z-d/2-.12,e=z+d/2+.12;
+      // 家具・壁との重なりと、拾う物や鏡の前をふさぐ配置を避ける。
+      if(C.col.list.some(o=>a<o.x1&&b>o.x0&&c<o.z1&&e>o.z0)) return false;
+      return !C.inter.some(it=>it.x>a-.4&&it.x<b+.4&&it.z>c-.4&&it.z<e+.4);
+    });
+    if(!at) continue;
+    const [x,z]=at, g=new THREE.Group(); g.position.set(x,0,z);
+    g.userData.furniture=kind; g.userData.roomNo=C.unit.no; C.g.add(g);
+    const part=(ww,h,dd,mat,px,py,pz)=>put(g,box(ww,h,dd,mat),px,py,pz);
+    const m=C.mats;
+    if(kind==='bed') {
+      part(w,.2,d,m.darkwood,0,.25,0); part(w-.08,.18,d-.1,m.cushion,0,.44,0);
+      part(w,.85,.08,m.wood,0,.48,-d/2+.04);
+      part(w-.22,.12,.38,m.letterPaper,0,.57,-d/2+.35);
+      part(w-.06,.05,d*.6,m.shade,0,.56,d*.15);
+      for(const xx of [-w/2+.08,w/2-.08])for(const zz of [-d/2+.1,d/2-.1])part(.09,.3,.09,m.darkwood,xx,.15,zz);
+    } else if(kind==='dresser') {
+      part(w,1.28,d,m.wood,0,.66,0);part(w+.06,.06,d+.04,m.darkwood,0,1.33,0);
+      for(let i=0;i<4;i++){part(w-.08,.27,.035,m.darkwood,0,.2+i*.3,d/2+.015);for(const xx of [-.23,.23])part(.14,.025,.045,m.steel,xx,.2+i*.3,d/2+.05);}
+    } else {
+      const h=kind==='desk'?.74:.48;
+      part(w,.065,d,m.wood,0,h,0);
+      for(const xx of [-w/2+.06,w/2-.06])for(const zz of [-d/2+.06,d/2-.06])part(.065,h,.065,m.darkwood,xx,h/2,zz);
+      if(kind==='desk'){part(w*.36,.18,d-.04,m.darkwood,w*.27,h-.12,0);part(.15,.025,.035,m.steel,w*.27,h-.12,d/2);}
+    }
+    C.blk(x-w/2,z-d/2,x+w/2,z+d/2);
+  }
+}
 function buildMemoProp(C, id, px, pz) {
   const g = new THREE.Group();
   const isLetter = id === "m5" || id === "m3draft";
@@ -625,10 +672,10 @@ const FURNISH = {
   kitchen(C) {
     const { mats, dx, x0, x1, z0, z1, zMid, H } = C;
     // 靴箱
-    C.pb(0.9, 0.75, 0.35, mats.wood, x1 - 0.6, 0.38, z0 - 2.5);
-    C.blk(x1 - 1.1, z0 - 2.7, x1 - 0.1, z0 - 2.3);
+    C.pb(0.9, 0.75, 0.35, mats.wood, x1 - 0.6, 0.38, z0 - 1.95);
+    C.blk(x1 - 1.1, z0 - 2.15, x1 - 0.1, z0 - 1.75);
     // 靴箱の上。ここに懐中電灯や鍵を置きます
-    C.itemAt = [x1 - 0.6, z0 - 2.48];
+    C.itemAt = [x1 - 0.6, z0 - 1.93];
     // 押し入れ
     C.pb(1.8, H, 0.5, mats.wood, x1 - 1.1, H / 2, z1 + 0.26);
     C.blk(x1 - 2.0, z1, x1 - 0.2, z1 + 0.5);
