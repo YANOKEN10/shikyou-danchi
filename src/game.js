@@ -291,6 +291,8 @@ export class Game {
     this.snd.roomToneOff();
     this.snd.waterOff();
 
+    if (this.state.flags.chase && !this.state.flags.cleared) this._spawnEscapePursuer(true);
+
     // 事件の時計
     this.floorTime = 0;
     this.eventsDone = new Set();
@@ -1103,11 +1105,17 @@ export class Game {
     this.snd.buzzOff();
     this.ui.sayNow("——廊下の灯りが、いっせいに落ちた。");
     this.ui.say("階段まで。振り返るな。");
-    this.stalkers.spawn({ speed: 2.35, hear: 30, sight: 40, patience: 99 }, this.floor.len, 2);
-    this.stalkers.enrage(1);
-    this.stalkers.list.forEach((s, i) => s.place(this.floor.len - 1.5 - i * 3));
+    this._spawnEscapePursuer(false);
   }
 
+  _spawnEscapePursuer(fromStairs) {
+    const stair=this.floor.stair;
+    this.stalkers.spawn({escape:true,fromStairs,landingX:this.floor.spawn.x,landingZ:this.floor.spawn.z},this.floor.len,1);
+    const s=this.stalkers.list[0];
+    if(fromStairs){const up=this.floor.inter.find(it=>it.kind==="up");s.x=up.x;s.z=up.z;s.escapeDelay=3.5;}
+    else {s.x=Math.min(this.floor.len-1.5,Math.max(8,this.player.pos.x+7));s.z=1.25;s.escapeDelay=2.5;}
+    s.mesh.position.set(s.x,fromStairs?1.5:0,s.z);s.mesh.visible=true;s.state="hunt";
+  }
   async _escape() {
     this.paused = true;
     this.snd.allOff();

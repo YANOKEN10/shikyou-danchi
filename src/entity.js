@@ -56,7 +56,40 @@ export class Stalker {
     return dot;
   }
 
+  _updateEscape(dt, player, col, out) {
+    // 通常の廊下AIと分け、逃げた足取りをたどることで階段室の壁を抜けない。
+    this.state = "hunt"; this.mesh.visible = true;
+    this.escapeDelay = Math.max(0, (this.escapeDelay || 0) - dt);
+    const dist = Math.hypot(this.x-player.pos.x,this.z-player.pos.z);
+    if(!player.inUnit) {
+      if(!this.escapeTrail) this.escapeTrail = this.cfg.fromStairs
+        ? [{x:this.cfg.landingX,z:this.cfg.landingZ}]
+        : [{x:player.pos.x,z:LANE_Z}];
+      const tail=this.escapeTrail[this.escapeTrail.length-1] || {x:this.x,z:this.z};
+      if(Math.hypot(tail.x-player.pos.x,tail.z-player.pos.z)>.18) this.escapeTrail.push({x:player.pos.x,z:player.pos.z});
+    }
+    this.lookBoost=Math.max(0,(this.lookBoost||0)-dt);
+    if(!player.inUnit && this._inView(player)>.65 && col.clear(this.x,this.z,player.pos.x,player.pos.z)) this.lookBoost=2;
+    // 走行4.5m/sより十分遅く、通常は歩行2.45m/sでも距離を離せる。
+    this.escapeSpeed=this.lookBoost>0?2.8:1.7;
+    let remaining=this.escapeDelay>0?0:this.escapeSpeed*dt;
+    this.moving=false;
+    while(remaining>0 && this.escapeTrail?.length) {
+      const t=this.escapeTrail[0], dx=t.x-this.x,dz=t.z-this.z,d=Math.hypot(dx,dz);
+      if(d<.03){this.escapeTrail.shift();continue;}
+      const step=Math.min(d,remaining);this.x+=dx/d*step;this.z+=dz/d*step;remaining-=step;this.moving=true;
+      this.mesh.rotation.y=Math.atan2(dx,dz);
+      if(step===d)this.escapeTrail.shift();
+    }
+    animateEntity(this.mesh,dt,this.moving);
+    // 下階では上り階段から降りて現れる。暗転明けの猶予中は捕獲しない。
+    this.mesh.position.set(this.x,this.cfg.fromStairs?Math.max(0,this.escapeDelay-1)*.6:0,this.z);
+    if(out){out.hunting=true;out.tension=Math.max(.45,1-dist/16);out.nearestDistance=dist;out.nearPan=Math.max(-1,Math.min(1,(this.x-player.pos.x)/5));out.veryNear=dist<3?1:0;
+      if(!player.inUnit && this.escapeDelay<=0 && Math.hypot(this.x-player.pos.x,this.z-player.pos.z)<.45)out.caught=true;
+    }
+  }
   update(dt, player, col, snd, out) {
+    if (this.cfg.escape) return this._updateEscape(dt, player, col, out);
     const cfg = this.cfg;
     const dist = Math.hypot(this.x - player.pos.x, this.z - player.pos.z);
     const safe = player.inUnit || player.pos.x < 0.2;   // 住戸か階段室

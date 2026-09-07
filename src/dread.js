@@ -27,7 +27,7 @@ export class DreadDirector {
 
   update(dt, chaseOut) {
     const g = this.g;
-    if (!g.floor || (g.versus && g.versus.on)) return;
+    if (!g.floor || g.state.flags.chase || (g.versus && g.versus.on)) return;
     this._blinkStep(dt);
 
     if (chaseOut && chaseOut.nearMiss) this.nearMiss();
