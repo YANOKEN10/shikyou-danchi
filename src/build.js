@@ -1704,12 +1704,14 @@ export function setEntityPose(ent, pose, force) {
   if (!force && u.pose === next) return;
   u.pose = next;
   u.rig.position.set(0, 0, 0); u.rig.rotation.set(0, 0, 0); u.rig.scale.set(1, 1, 1);
+  // The face points along local +Z; counter-rotate the neck when the torso leans forward.
+  u.headPivot.rotation.x = next === "crawl" ? -0.85 : 0;
   u.arms.forEach((arm, i) => { arm.rotation.set(0, 0, i ? 0.22 : -0.22); arm.userData.elbow.rotation.set(0, 0, 0); });
   if (next === "crouch") {
     u.rig.scale.set(1.1, 0.72, 1.08); u.rig.rotation.x = 0.12;
     u.arms.forEach((arm, i) => { arm.rotation.x = -0.55; arm.userData.elbow.rotation.x = -0.75; arm.rotation.z = i ? -0.28 : 0.28; });
   } else if (next === "crawl") {
-    u.rig.position.set(0, 0.42, 0.18); u.rig.rotation.x = -1.05; u.rig.scale.set(1.05, 0.78, 1.05);
+    u.rig.position.set(0, 0.42, 0.18); u.rig.rotation.x = 1.05; u.rig.scale.set(1.05, 0.78, 1.05);
     u.arms.forEach((arm, i) => { arm.rotation.x = -1.15; arm.rotation.z = i ? -0.5 : 0.5; arm.userData.elbow.rotation.x = -0.8; });
   } else if (next === "lean") {
     u.rig.position.z = 0.13; u.rig.rotation.x = 0.34; u.rig.scale.set(1.03, 0.94, 1.08);
@@ -1796,7 +1798,7 @@ export function animateEntity(ent, dt, moving) {
 
   // 体勢ごとの基準角へ小さな関節運動だけを足し、走査ごとに姿勢が初期化されないようにする。
   const armLean = u.pose === "crawl" ? -1.15 : u.pose === "kneel" ? -0.72 : u.pose === "crouch" ? -0.55 : u.pose === "lean" ? -0.3 : 0;
-  const armSpread = u.pose === "crawl" ? 0.5 : u.pose === "crouch" ? 0.28 : u.pose === "kneel" ? 0.2 : 0.05;
+  const armSpread = u.pose === "crawl" ? 0.5 : u.pose === "crouch" ? 0.28 : u.pose === "kneel" ? 0.2 : -0.22;
   u.arms[0].rotation.x = armLean + s * (moving ? 0.16 : 0.025);
   u.arms[1].rotation.x = armLean - s * (moving ? 0.16 : 0.025);
   u.arms[0].rotation.z = armSpread + s * 0.018;
@@ -1812,7 +1814,7 @@ export function animateEntity(ent, dt, moving) {
     u.tilt = (Math.random() - 0.5) * 1.15;
   }
   u.headPivot.rotation.z += (u.tilt - u.headPivot.rotation.z) * Math.min(1, dt * 14);
-  u.headPivot.rotation.x = Math.sin(u.phase * 0.37) * 0.06;
+  u.headPivot.rotation.x = (u.pose === "crawl" ? -0.85 : 0) + Math.sin(u.phase * 0.37) * 0.06;
   // 口と髪を別々に動かすことで、近距離でも模型全体が一塊に揺れる印象を避ける。
   u.mouth.scale.y = 0.62 + Math.max(0, Math.sin(u.phase * 0.43)) * 0.1;
   u.hairStrands.forEach((strand, i) => {
