@@ -55,6 +55,7 @@ function generatedTexture(path, rx = 1, ry = 1) {
   tex.repeat.set(rx, ry);
   return tex;
 }
+const entityAtlas = generatedTexture("./assets/entity-red-atlas.png");
 const generatedWall = generatedTexture("./assets/generated/wall-plaster-v2.png?v=20260906", 2, 1);
 const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 2, 2);
 const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-v2.png?v=20260830");
@@ -1593,46 +1594,30 @@ export function buildEntity() {
   const rig = new THREE.Group();
   g.add(rig);
 
-  // 正面画像を貼らず、粗さ・凹凸・奥行きを持つ部品だけで全身を構成する。
-  // 至近距離や真横でも輪郭が破綻しないことを、見た目の最優先にする。
-  const shroud = TX.shroud();
-  const cloth = new THREE.MeshStandardMaterial({
-    map: shroud, bumpMap: shroud, bumpScale: 0.035, color: 0x34363a,
-    roughness: 0.96, metalness: 0.01, side: THREE.DoubleSide,
-  });
-  const clothDark = new THREE.MeshStandardMaterial({ color: 0x111116, roughness: 1 });
-  const skin = new THREE.MeshStandardMaterial({
-    color: 0x777168, roughness: 0.84, metalness: 0.02,
-    emissive: 0x120f0d, emissiveIntensity: 0.32,
-  });
-  const bruised = new THREE.MeshStandardMaterial({ color: 0x302526, roughness: 0.92 });
-  const mouthMat = new THREE.MeshStandardMaterial({ color: 0x030202, roughness: 0.55 });
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x010101, roughness: 0.08, metalness: 0.1 });
-  const wetHair = new THREE.MeshStandardMaterial({ color: 0x08090b, roughness: 0.28, metalness: 0.08 });
-  const toothMat = new THREE.MeshStandardMaterial({ color: 0x9a927d, roughness: 0.72 });
-
-  const prof = [
-    [0.36, 0.18], [0.34, 0.42], [0.31, 0.72], [0.26, 1.05],
-    [0.23, 1.28], [0.26, 1.43], [0.22, 1.53], [0.10, 1.63],
-  ].map(([r, y]) => new THREE.Vector2(r, y));
-  const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 28), cloth);
-  body.scale.z = 0.72;
-  rig.add(body);
-
-  // 胸元の縫い目と皺を実形状にし、平たい円錐の服に見えないよう陰影を増やす。
-  for (let i = -2; i <= 2; i++) {
-    const seam = new THREE.Mesh(new THREE.CapsuleGeometry(0.006, 0.72, 3, 6), clothDark);
-    seam.position.set(i * 0.085, 1.03, 0.205 - Math.abs(i) * 0.018);
-    seam.rotation.z = i * 0.035;
-    rig.add(seam);
+  // Generated face and woven crimson cloth share one atlas; geometry remains fully articulated.
+  const atlas = entityAtlas;
+  const fabric = atlas.clone();
+  fabric.repeat.set(0.496, 0.412); fabric.offset.set(0.502, 0.586);
+  const cloth = new THREE.MeshStandardMaterial({map:fabric, color:0xb86666, roughness:0.91, side:THREE.DoubleSide});
+  const clothDark = new THREE.MeshStandardMaterial({color:0x360609, roughness:0.95});
+  const skin = new THREE.MeshStandardMaterial({color:0x81796d, roughness:0.82});
+  const wetHair = new THREE.MeshStandardMaterial({color:0x100c0c, roughness:0.4});
+  const prof = [[0.42,0.05],[0.39,0.2],[0.34,0.5],[0.27,0.8],[0.17,1.12],
+    [0.155,1.23],[0.21,1.4],[0.235,1.49],[0.15,1.54],[0.085,1.57]].map(([r,y])=>new THREE.Vector2(r,y));
+  const dressGeo = new THREE.LatheGeometry(prof,64);
+  const dp=dressGeo.attributes.position;
+  for(let i=0;i<dp.count;i++){
+    const x=dp.getX(i),y=dp.getY(i),z=dp.getZ(i),angle=Math.atan2(x,z);
+    const fold=1+Math.sin(angle*16+0.2)*0.055*Math.max(0,(1.25-y)/1.2);
+    dp.setXYZ(i,x*fold,y,z*fold);
   }
-
-  const hem = buildHem(clothDark, 0.36, 0.18);
-  hem.scale.z = 0.82;
-  rig.add(hem);
-  const shadow = buildBlob(new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.82 }), hem.userData.base, 0.94);
-  shadow.position.y = 0.011;
-  g.add(shadow);
+  dressGeo.computeVertexNormals();
+  const body=new THREE.Mesh(dressGeo,cloth);body.scale.z=0.72;rig.add(body);
+  const belt=new THREE.Mesh(new THREE.CylinderGeometry(0.159,0.17,0.065,40),clothDark);
+  belt.scale.z=0.72;belt.position.y=1.19;rig.add(belt);
+  const hem=buildHem(cloth,0.42,0.055);hem.scale.set(0.96,0.3,0.69);hem.visible=false;rig.add(hem);
+  const shadow=buildBlob(new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:0.82}),hem.userData.base,0.94);
+  shadow.position.y=0.011;g.add(shadow);
 
   const arms = [], hands = [];
   [-1, 1].forEach((side) => {
@@ -1662,68 +1647,48 @@ export function buildEntity() {
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.082, 0.16, 14), skin);
   neck.position.y = 1.66; rig.add(neck);
   const headPivot = new THREE.Group(); headPivot.position.y = 1.81; rig.add(headPivot);
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.17, 28, 22), skin);
-  skull.scale.set(0.92, 1.18, 0.88); headPivot.add(skull);
-
-  // 頬・顎・鼻を別形状で重ね、顔を一枚のお面ではなく凹凸のある骨格として見せる。
-  [-1, 1].forEach((side) => {
-    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.073, 18, 12), skin);
-    cheek.scale.set(0.8, 1.0, 0.46); cheek.position.set(side * 0.072, -0.035, 0.125);
-    headPivot.add(cheek);
-    const socket = new THREE.Mesh(new THREE.SphereGeometry(0.056, 18, 12), bruised);
-    socket.scale.set(1.18, 0.72, 0.42); socket.position.set(side * 0.066, 0.045, 0.142);
-    headPivot.add(socket);
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.038, 20, 14), eyeMat);
-    eye.scale.set(1.12, 0.82, 0.72); eye.position.set(side * 0.066, 0.043, 0.174);
-    headPivot.add(eye);
-    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.005, 8, 6), new THREE.MeshBasicMaterial({ color: 0xc8d5d2 }));
-    glint.position.set(side * 0.054, 0.054, 0.207); headPivot.add(glint);
-  });
-  const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.105, 22, 14), skin);
-  jaw.scale.set(0.83, 0.78, 0.62); jaw.position.set(0, -0.132, 0.074); headPivot.add(jaw);
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.034, 0.105, 10), skin);
-  nose.rotation.x = Math.PI / 2; nose.position.set(0, -0.012, 0.195); headPivot.add(nose);
-  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.072, 22, 14), mouthMat);
-  mouth.scale.set(1, 0.62, 0.3); mouth.position.set(0, -0.116, 0.157); headPivot.add(mouth);
-  const teeth = [];
-  for (let i = 0; i < 9; i++) {
-    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.034 + (i % 2) * 0.009, 6), toothMat);
-    tooth.position.set((i - 4) * 0.014, -0.092, 0.183); tooth.rotation.z = Math.PI + (i - 4) * 0.018;
-    headPivot.add(tooth); teeth.push(tooth);
+  const skull=new THREE.Mesh(new THREE.SphereGeometry(0.166,32,24),skin);
+  skull.scale.set(0.88,1.3,0.8);skull.position.z=-0.025;headPivot.add(skull);
+  // Project the photographic skin onto a sculpted surface, including nose, cheeks and jaw.
+  const faceGeo=new THREE.PlaneGeometry(0.35,0.445,40,48);
+  const fp=faceGeo.attributes.position,uv=faceGeo.attributes.uv;
+  const bell=(x,y,cx,cy,wx,wy)=>Math.exp(-(((x-cx)/wx)**2)-(((y-cy)/wy)**2));
+  for(let i=0;i<fp.count;i++){
+    const x=fp.getX(i),y=fp.getY(i);
+    const round=Math.sqrt(Math.max(0.015,1-(y/0.225)**2));
+    const dome=Math.sqrt(Math.max(0,1-(x/0.176)**2))*0.16*round;
+    const nose=0.057*bell(x,y,0,-0.012,0.024,0.069);
+    const cheek=0.014*(bell(x,y,-0.08,-0.018,0.04,0.045)+bell(x,y,0.08,-0.018,0.04,0.045));
+    fp.setXYZ(i,x*round,y,-0.019+dome+nose+cheek);
+    uv.setXY(i,0.065+uv.getX(i)*0.37,0.588+uv.getY(i)*0.383);
   }
+  faceGeo.computeVertexNormals();
+  const face=new THREE.Mesh(faceGeo,new THREE.MeshStandardMaterial({map:atlas,roughness:0.86,side:THREE.DoubleSide}));
+  headPivot.add(face);
+  const faceBase=Float32Array.from(fp.array);
+  // Keep a mouth anchor for the common pose rig; expression deforms the textured skin below.
+  const mouth=new THREE.Object3D();headPivot.add(mouth);const teeth=[];
+  const hairStrands=[];
+  const hairCap=new THREE.Mesh(new THREE.SphereGeometry(0.176,32,24,0,Math.PI*2,0,0.7),wetHair);
+  hairCap.scale.set(1,1.35,0.94);hairCap.position.set(0,0,-0.035);headPivot.add(hairCap);
+  for(let i=0;i<30;i++){
+    const side=i%2?1:-1, row=Math.floor(i/2),x=side*(0.147+(row%4)*0.009);
+    const strand=new THREE.Group();strand.position.set(x,0.13,-0.014+(row%3)*0.041);
+    const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0),new THREE.Vector3(side*0.02,-0.15,0.015),
+      new THREE.Vector3(side*(0.008+row*0.001),-0.34,-0.025),new THREE.Vector3(side*0.035,-0.48-(row%5)*0.025,-0.01)]);
+    strand.add(new THREE.Mesh(new THREE.TubeGeometry(curve,16,0.0035+(row%3)*0.001,5,false),wetHair));
+    headPivot.add(strand);hairStrands.push(strand);
+  }
+  const backHair=new THREE.Mesh(new THREE.SphereGeometry(0.18,32,24),wetHair);
+  backHair.scale.set(1,2.1,0.42);backHair.position.set(0,-0.13,-0.12);headPivot.add(backHair);
 
-  // 傷は線を描いた板ではなく細い管として皮膚に沿わせ、斜めからも浮き上がって見えるようにする。
-  const scars = [];
-  [[-0.12, 0.09, -0.055, -0.09], [0.105, 0.12, 0.045, -0.07], [-0.02, 0.13, 0.025, 0.03]].forEach(([x0, y0, x1, y1]) => {
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(x0, y0, 0.169), new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2 + 0.018, 0.202),
-      new THREE.Vector3(x1, y1, 0.177),
-    ]);
-    const scar = new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 0.0035, 5, false), bruised);
-    headPivot.add(scar); scars.push(scar);
+  [-1,1].forEach(side=>{
+    const lock=new THREE.Mesh(new THREE.SphereGeometry(0.1,24,18),wetHair);
+    lock.scale.set(0.42,2.7,0.95);lock.position.set(side*0.146,-0.08,-0.012);headPivot.add(lock);
   });
-
-  const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.184, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.78), wetHair);
-  hairTop.scale.set(1.03, 1.14, 1.03); hairTop.position.y = 0.035; headPivot.add(hairTop);
-  const hairStrands = [];
-  // 目と口を隠し切らない位置へ濡れ髪を束で垂らし、以前の「怖い顔が見えない」状態を避ける。
-  [-0.17, -0.145, -0.12, -0.095, 0.10, 0.13, 0.16].forEach((x, i) => {
-    const strand = new THREE.Group();
-    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.012 + (i % 2) * 0.004, 0.34 + (i % 3) * 0.08, 4, 7), wetHair);
-    upper.position.y = -0.18 - (i % 2) * 0.05;
-    upper.rotation.z = x * 0.55;
-    const lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.38 + (i % 2) * 0.11, 4, 7), wetHair);
-    lower.position.y = -0.54 - (i % 3) * 0.035; lower.rotation.z = -x * 0.4;
-    strand.position.set(x, 0.025, 0.13 - Math.abs(x) * 0.18);
-    strand.add(upper, lower); headPivot.add(strand); hairStrands.push(strand);
-  });
-  // 後頭部の髪は厚い殻で作り、真横から頭部が空洞に見えないようにする。
-  const backHair = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.52, 8, 18), wetHair);
-  backHair.scale.set(1.02, 1, 0.68); backHair.position.set(0, -0.28, -0.075); headPivot.add(backHair);
-
   g.traverse((o) => { o.layers.set(1); if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   g.userData = {
-    rig, body, hem, shadow, arms, hands, headPivot, skull, mouth, teeth,
+    rig, body, hem, shadow, arms, hands, headPivot, skull, mouth, teeth, face, faceBase, expression: 0, expressionAge: 0,
     veil: backHair, hairStrands, pose: "stand", phase: Math.random() * 6,
     twitch: 2 + Math.random() * 4, tilt: 0, H, hemT: Math.random() * 10,
   };
@@ -1739,7 +1704,7 @@ export function setEntityPose(ent, pose, force) {
   if (!force && u.pose === next) return;
   u.pose = next;
   u.rig.position.set(0, 0, 0); u.rig.rotation.set(0, 0, 0); u.rig.scale.set(1, 1, 1);
-  u.arms.forEach((arm, i) => { arm.rotation.set(0, 0, i ? -0.05 : 0.05); arm.userData.elbow.rotation.set(0, 0, 0); });
+  u.arms.forEach((arm, i) => { arm.rotation.set(0, 0, i ? 0.22 : -0.22); arm.userData.elbow.rotation.set(0, 0, 0); });
   if (next === "crouch") {
     u.rig.scale.set(1.1, 0.72, 1.08); u.rig.rotation.x = 0.12;
     u.arms.forEach((arm, i) => { arm.rotation.x = -0.55; arm.userData.elbow.rotation.x = -0.75; arm.rotation.z = i ? -0.28 : 0.28; });
@@ -1804,6 +1769,22 @@ export function buildSurvivor(name) {
 export function animateEntity(ent, dt, moving) {
   const u = ent.userData;
   u.phase += dt * (moving ? 2.6 : 0.8);
+  u.expressionAge += dt;
+  const intensity=ent.userData.hunting ? 1 : moving ? 0.58 : 0.28;
+  u.expression += (intensity-u.expression)*Math.min(1,dt*4);
+  const jaw=(0.5+0.5*Math.sin(u.phase*0.83))*u.expression;
+  const arrival=Math.exp(-u.expressionAge*1.7);
+  const blink=Math.pow(Math.max(0,Math.sin(u.expressionAge*1.9)),24);
+  const vertices=u.face.geometry.attributes.position;
+  for(let i=0;i<vertices.count;i++){
+    const x=u.faceBase[i*3],y=u.faceBase[i*3+1],z=u.faceBase[i*3+2];
+    const lips=Math.exp(-((x/0.085)**2)-(((y+0.132)/0.044)**2));
+    const eyes=Math.exp(-(((Math.abs(x)-0.065)/0.034)**2)-(((y-0.045)/0.04)**2));
+    const brow=Math.exp(-(((Math.abs(x)-0.065)/0.044)**2)-(((y-0.087)/0.026)**2));
+    vertices.setXYZ(i,x+Math.sign(x)*lips*jaw*0.005,
+      y-lips*jaw*0.017-eyes*(y-0.045)*blink*0.65-brow*(u.expression+arrival)*0.006,z+lips*jaw*0.005);
+  }
+  vertices.needsUpdate=true;u.face.geometry.computeVertexNormals();
   const s = Math.sin(u.phase), breathe = 1 + Math.sin(u.phase * 0.53) * 0.012;
 
   // 全身の立体部品を呼吸させ、写真面の拡縮に頼らず生体らしい微動を作る。

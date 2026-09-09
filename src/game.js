@@ -37,7 +37,7 @@ export class Game {
     this.player = new Player(this.camera, sound);
     this.player.bindMouse(canvas);
     this.player.onBatteryDead = () => {
-      this.ui.sayNow("——電池が切れた。");
+      this.ui.sayNow("——電池が切れた。懐中電灯は持っている。電池を交換しよう。");
       this.snd.click();
     };
     this.player.onLockChange = (locked) => {
@@ -50,7 +50,7 @@ export class Game {
     // 「灯」を押したのに点かないとき、理由を出す
     this.player.onLightFail = (why) => {
       if (why === "none") this.ui.sayNow("懐中電灯を持っていない。一〇一号室の玄関に置いたままだ。");
-      else if (why === "empty") this.ui.sayNow("電池が切れている。予備を探すしかない。");
+      else if (why === "empty") this.ui.sayNow("懐中電灯の電池が切れている。この階の部屋で交換用の電池を探そう。");
       else if (why === "swap") this.ui.sayNow("電池を入れ替えた。");
     };
 

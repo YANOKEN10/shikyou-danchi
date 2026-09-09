@@ -81,6 +81,7 @@ export class Stalker {
       this.mesh.rotation.y=Math.atan2(dx,dz);
       if(step===d)this.escapeTrail.shift();
     }
+    this.mesh.userData.hunting = true;
     animateEntity(this.mesh,dt,this.moving);
     // 下階では上り階段から降りて現れる。暗転明けの猶予中は捕獲しない。
     this.mesh.position.set(this.x,this.cfg.fromStairs?Math.max(0,this.escapeDelay-1)*.6:0,this.z);
@@ -240,6 +241,7 @@ export class Stalker {
     this.mesh.position.set(this.x, 0, this.z);
     const face = (goal - this.x) >= 0 ? Math.PI / 2 : -Math.PI / 2;
     this.mesh.rotation.y += (face - this.mesh.rotation.y) * Math.min(1, dt * 4);
+    this.mesh.userData.hunting = this.state === "hunt";
     animateEntity(this.mesh, dt, this.moving);
 
     /* --- つかまえる --- */
@@ -332,6 +334,7 @@ export class Apparition {
     this.mesh.rotation.y = -Math.PI / 2;
     this.mesh.scale.setScalar(o.scale || 1);
     this.mesh.visible = true;
+    this.mesh.userData.expressionAge = 0;
     this.life = sec || 1.4;
     this.mode = o.mode || "still";
     this.speed = o.speed || 0.28;
