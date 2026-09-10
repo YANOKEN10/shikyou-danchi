@@ -1612,6 +1612,7 @@ export function buildEntity() {
     dp.setXYZ(i,x*fold,y,z*fold);
   }
   dressGeo.computeVertexNormals();
+  const dressBase=Float32Array.from(dp.array);
   const body=new THREE.Mesh(dressGeo,cloth);body.scale.z=0.72;rig.add(body);
   const belt=new THREE.Mesh(new THREE.CylinderGeometry(0.159,0.17,0.065,40),clothDark);
   belt.scale.z=0.72;belt.position.y=1.19;rig.add(belt);
@@ -1647,7 +1648,7 @@ export function buildEntity() {
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.082, 0.16, 14), skin);
   neck.position.y = 1.66; rig.add(neck);
   const headPivot = new THREE.Group(); headPivot.position.y = 1.81; rig.add(headPivot);
-  const skull=new THREE.Mesh(new THREE.SphereGeometry(0.166,32,24),skin);
+  const skull=new THREE.Mesh(new THREE.SphereGeometry(0.166,32,24),wetHair);
   skull.scale.set(0.88,1.3,0.8);skull.position.z=-0.025;headPivot.add(skull);
   // Project the photographic skin onto a sculpted surface, including nose, cheeks and jaw.
   const faceGeo=new THREE.PlaneGeometry(0.35,0.445,40,48);
@@ -1657,9 +1658,11 @@ export function buildEntity() {
     const x=fp.getX(i),y=fp.getY(i);
     const round=Math.sqrt(Math.max(0.015,1-(y/0.225)**2));
     const dome=Math.sqrt(Math.max(0,1-(x/0.176)**2))*0.16*round;
-    const nose=0.057*bell(x,y,0,-0.012,0.024,0.069);
+    const nose=0.05*bell(x,y,0,-0.027,0.019,0.049);
     const cheek=0.014*(bell(x,y,-0.08,-0.018,0.04,0.045)+bell(x,y,0.08,-0.018,0.04,0.045));
-    fp.setXYZ(i,x*round,y,-0.019+dome+nose+cheek);
+    const socket=0.015*(bell(x,y,-0.067,0.045,0.035,0.03)+bell(x,y,0.067,0.045,0.035,0.03));
+    const chin=0.022*bell(x,y,0,-0.16,0.061,0.043);
+    fp.setXYZ(i,x*round,y,-0.019+dome+nose+cheek+chin-socket);
     uv.setXY(i,0.065+uv.getX(i)*0.37,0.588+uv.getY(i)*0.383);
   }
   faceGeo.computeVertexNormals();
@@ -1669,26 +1672,31 @@ export function buildEntity() {
   // Keep a mouth anchor for the common pose rig; expression deforms the textured skin below.
   const mouth=new THREE.Object3D();headPivot.add(mouth);const teeth=[];
   const hairStrands=[];
-  const hairCap=new THREE.Mesh(new THREE.SphereGeometry(0.176,32,24,0,Math.PI*2,0,0.7),wetHair);
-  hairCap.scale.set(1,1.35,0.94);hairCap.position.set(0,0,-0.035);headPivot.add(hairCap);
-  for(let i=0;i<30;i++){
-    const side=i%2?1:-1, row=Math.floor(i/2),x=side*(0.147+(row%4)*0.009);
-    const strand=new THREE.Group();strand.position.set(x,0.13,-0.014+(row%3)*0.041);
-    const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0),new THREE.Vector3(side*0.02,-0.15,0.015),
-      new THREE.Vector3(side*(0.008+row*0.001),-0.34,-0.025),new THREE.Vector3(side*0.035,-0.48-(row%5)*0.025,-0.01)]);
-    strand.add(new THREE.Mesh(new THREE.TubeGeometry(curve,16,0.0035+(row%3)*0.001,5,false),wetHair));
-    headPivot.add(strand);hairStrands.push(strand);
+  // The scalp follows the skull. Tapered irregular locks replace the large oval hair pieces.
+  const backHair=new THREE.Mesh(new THREE.SphereGeometry(0.173,32,24,Math.PI,Math.PI,0,Math.PI),wetHair);
+  backHair.scale.set(0.96,1.3,0.93);backHair.position.z=-0.029;headPivot.add(backHair);
+  for(let i=0;i<68;i++){
+    const angle=Math.PI*0.5+(i/67)*Math.PI, side=Math.cos(angle)>=0?1:-1;
+    const startY=.085+.03*Math.sin(i*2.4), ring=Math.sqrt(1-(startY/.225)**2);
+    const x=Math.sin(angle)*0.148*ring,z=Math.cos(angle)*0.13*ring-0.026;
+    const strand=new THREE.Group();strand.position.set(x,startY,z);
+    const length=0.40+0.17*(0.5+0.5*Math.sin(i*1.73));
+    const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0),new THREE.Vector3(x*0.07,-length*.3,0.016),
+      new THREE.Vector3(x*.08+Math.sin(i)*.012,-length*.7,-.012),new THREE.Vector3(x*.15+Math.sin(i*2)*.013,-length,-.018)]);
+    const geo=new THREE.TubeGeometry(curve,18,0.004+(i%4)*0.0014,5,false);
+    const hp=geo.attributes.position;
+    for(let j=0;j<hp.count;j++){const t=Math.floor(j/6)/18,c=curve.getPointAt(t),taper=1-t*.85;hp.setXYZ(j,c.x+(hp.getX(j)-c.x)*taper,c.y+(hp.getY(j)-c.y)*taper,c.z+(hp.getZ(j)-c.z)*taper);}
+    geo.computeVertexNormals();strand.add(new THREE.Mesh(geo,wetHair));headPivot.add(strand);hairStrands.push(strand);
   }
-  const backHair=new THREE.Mesh(new THREE.SphereGeometry(0.18,32,24),wetHair);
-  backHair.scale.set(1,2.1,0.42);backHair.position.set(0,-0.13,-0.12);headPivot.add(backHair);
-
-  [-1,1].forEach(side=>{
-    const lock=new THREE.Mesh(new THREE.SphereGeometry(0.1,24,18),wetHair);
-    lock.scale.set(0.42,2.7,0.95);lock.position.set(side*0.146,-0.08,-0.012);headPivot.add(lock);
-  });
+  // Narrow temple locks preserve the profile while leaving the eye and hooked nose visible.
+  [-1,1].forEach(side=>{for(let i=0;i<9;i++){
+    const strand=new THREE.Group();strand.position.set(side*(.13+i*.0015),.09-i*.003,.025+i*.005);
+    const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0),new THREE.Vector3(side*.009,-.15,.004),new THREE.Vector3(side*.015,-.39-i*.012,-.01)]);
+    strand.add(new THREE.Mesh(new THREE.TubeGeometry(curve,16,.0035,5,false),wetHair));headPivot.add(strand);hairStrands.push(strand);
+  }});
   g.traverse((o) => { o.layers.set(1); if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   g.userData = {
-    rig, body, hem, shadow, arms, hands, headPivot, skull, mouth, teeth, face, faceBase, expression: 0, expressionAge: 0,
+    rig, body, dressBase, hem, shadow, arms, hands, headPivot, skull, mouth, teeth, face, faceBase, expression: 0, expressionAge: 0, motion: 0,
     veil: backHair, hairStrands, pose: "stand", phase: Math.random() * 6,
     twitch: 2 + Math.random() * 4, tilt: 0, H, hemT: Math.random() * 10,
   };
@@ -1702,6 +1710,7 @@ export function setEntityPose(ent, pose, force) {
   if (!u || !u.rig) return;
   const next = ["stand", "crouch", "crawl", "lean", "kneel"].includes(pose) ? pose : "stand";
   if (!force && u.pose === next) return;
+  const previous={position:u.rig.position.clone(),rotation:u.rig.rotation.clone(),scale:u.rig.scale.clone(),head:u.headPivot.rotation.clone(),arms:u.arms.map(a=>({arm:a.rotation.clone(),elbow:a.userData.elbow.rotation.clone()}))};
   u.pose = next;
   u.rig.position.set(0, 0, 0); u.rig.rotation.set(0, 0, 0); u.rig.scale.set(1, 1, 1);
   // The face points along local +Z; counter-rotate the neck when the torso leans forward.
@@ -1720,6 +1729,9 @@ export function setEntityPose(ent, pose, force) {
     u.rig.scale.set(1.07, 0.76, 1.04); u.rig.position.y = 0.02;
     u.arms.forEach((arm, i) => { arm.rotation.x = -0.72; arm.rotation.z = i ? -0.2 : 0.2; });
   }
+  u.poseTarget={position:u.rig.position.clone(),rotation:u.rig.rotation.clone(),scale:u.rig.scale.clone()};
+  if(!force){u.rig.position.copy(previous.position);u.rig.rotation.copy(previous.rotation);u.rig.scale.copy(previous.scale);u.headPivot.rotation.copy(previous.head);u.arms.forEach((a,i)=>{a.rotation.copy(previous.arms[i].arm);a.userData.elbow.rotation.copy(previous.arms[i].elbow);});}
+
 }
 
 /* ---------- 友達（住人）の姿 ---------- */
@@ -1770,7 +1782,12 @@ export function buildSurvivor(name) {
 
 export function animateEntity(ent, dt, moving) {
   const u = ent.userData;
-  u.phase += dt * (moving ? 2.6 : 0.8);
+  dt=Math.min(dt,0.1);
+  const ease=1-Math.exp(-dt*4);
+  u.motion+=((moving?1:0)-u.motion)*ease;
+  u.phase += dt * (0.65+u.motion*2.6);
+  if(u.poseTarget){u.rig.position.lerp(u.poseTarget.position,ease);u.rig.scale.lerp(u.poseTarget.scale,ease);
+    for(const axis of ['x','y','z'])u.rig.rotation[axis]+=(u.poseTarget.rotation[axis]-u.rig.rotation[axis])*ease;}
   u.expressionAge += dt;
   const intensity=ent.userData.hunting ? 1 : moving ? 0.58 : 0.28;
   u.expression += (intensity-u.expression)*Math.min(1,dt*4);
@@ -1790,31 +1807,38 @@ export function animateEntity(ent, dt, moving) {
   const s = Math.sin(u.phase), breathe = 1 + Math.sin(u.phase * 0.53) * 0.012;
 
   // 全身の立体部品を呼吸させ、写真面の拡縮に頼らず生体らしい微動を作る。
-  ent.position.y = Math.abs(Math.sin(u.phase * 1.7)) * (moving ? 0.022 : 0.006);
+  // Keep root height under stair control; the torso carries restrained weight shifts.
   u.body.scale.x = breathe; u.body.scale.z = 0.72 * breathe;
-  u.body.rotation.z = s * (moving ? 0.022 : 0.006);
+  u.body.rotation.z = s * (0.004+u.motion*0.012);
+  const clothPos=u.body.geometry.attributes.position;
+  for(let i=0;i<clothPos.count;i++){const x=u.dressBase[i*3],y=u.dressBase[i*3+1],z=u.dressBase[i*3+2],weight=Math.max(0,1-y/1.15);
+    clothPos.setXYZ(i,x+Math.sin(u.phase-1.5*y)*weight*u.motion*.013,y,z+Math.sin(u.phase+Math.atan2(x,z)*2-y)*weight*(.004+u.motion*.012));}
+  clothPos.needsUpdate=true;u.body.geometry.computeVertexNormals();
   u.hemT += dt * (moving ? 2.4 : 0.9);
   animateHem(u.hem, u.hemT, moving ? 1 : 0.18);
 
   // 体勢ごとの基準角へ小さな関節運動だけを足し、走査ごとに姿勢が初期化されないようにする。
   const armLean = u.pose === "crawl" ? -1.15 : u.pose === "kneel" ? -0.72 : u.pose === "crouch" ? -0.55 : u.pose === "lean" ? -0.3 : 0;
   const armSpread = u.pose === "crawl" ? 0.5 : u.pose === "crouch" ? 0.28 : u.pose === "kneel" ? 0.2 : -0.22;
-  u.arms[0].rotation.x = armLean + s * (moving ? 0.16 : 0.025);
-  u.arms[1].rotation.x = armLean - s * (moving ? 0.16 : 0.025);
-  u.arms[0].rotation.z = armSpread + s * 0.018;
-  u.arms[1].rotation.z = -armSpread - s * 0.018;
+  u.arms[0].rotation.x += (armLean + s * (0.02+u.motion*0.19)-u.arms[0].rotation.x)*ease;
+  u.arms[1].rotation.x += (armLean - Math.sin(u.phase+0.16) * (0.02+u.motion*0.19)-u.arms[1].rotation.x)*ease;
+  u.arms[0].rotation.z += (armSpread + s * 0.018-u.arms[0].rotation.z)*ease;
+  u.arms[1].rotation.z += (-armSpread - s * 0.018-u.arms[1].rotation.z)*ease;
   u.arms.forEach((arm, i) => {
+    const elbowBase=u.pose==='crawl'?-.8:u.pose==='crouch'?-.75:u.pose==='stand'?-.12:0;
+    arm.userData.elbow.rotation.x+=(elbowBase+Math.sin(u.phase+(i?Math.PI:0)-.5)*u.motion*.09-arm.userData.elbow.rotation.x)*ease;
     arm.userData.elbow.rotation.z = (i ? -1 : 1) * Math.sin(u.phase * 0.71) * (moving ? 0.07 : 0.025);
-    arm.userData.fingers.forEach((finger, j) => { finger.rotation.x = Math.sin(u.phase * 0.8 + j * 0.7) * 0.09; });
+    arm.userData.fingers.forEach((finger, j) => { finger.rotation.x = -0.18 + Math.sin(u.phase * 0.8 + j * 0.7) * 0.055; });
   });
 
   u.twitch -= dt;
   if (u.twitch <= 0) {
     u.twitch = 3 + Math.random() * 7;
-    u.tilt = (Math.random() - 0.5) * 1.15;
+    u.tilt = (Math.random() - 0.5) * 0.35;
   }
-  u.headPivot.rotation.z += (u.tilt - u.headPivot.rotation.z) * Math.min(1, dt * 14);
-  u.headPivot.rotation.x = (u.pose === "crawl" ? -0.85 : 0) + Math.sin(u.phase * 0.37) * 0.06;
+  u.headPivot.rotation.z += (u.tilt - u.headPivot.rotation.z) * (1-Math.exp(-dt*2.5));
+  const headTarget=(u.pose === "crawl" ? -0.85 : -0.035) + Math.sin(u.phase * 0.37) * 0.035;
+  u.headPivot.rotation.x+=(headTarget-u.headPivot.rotation.x)*ease;
   // 口と髪を別々に動かすことで、近距離でも模型全体が一塊に揺れる印象を避ける。
   u.mouth.scale.y = 0.62 + Math.max(0, Math.sin(u.phase * 0.43)) * 0.1;
   u.hairStrands.forEach((strand, i) => {

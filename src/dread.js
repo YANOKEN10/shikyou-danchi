@@ -109,7 +109,7 @@ export class DreadDirector {
       // 飛び出した後まで鏡面の平面像を残すと二体と板絵に見えるため、突進と同時に完全に消す。
       f.mesh.material.opacity = lunged ? 0 : Math.max(f.mesh.material.opacity, pulse * Math.sin(Math.PI * ((e.t % 2.4) / 2.4)));
       f.mesh.scale.setScalar(1 + stage * 0.14);
-      if (!rang && e.t > 0.6) { rang = true; g.snd.mirrorRing(); }
+      if (!rang && e.t > 0.6) { rang = true; /* Silent mirror appearance. */ }
       if (!lunged && e.t > 5.05) {
         lunged = true;
         f.mesh.material.opacity = 0;
@@ -128,8 +128,6 @@ export class DreadDirector {
     const g = this.g, b = g.curRoom.unitBounds;
     const x = g.curRoom.dx + (Math.random() < 0.5 ? -1.65 : 1.65);
     g.appar.show(x, b.z1 + 0.75, 6.5);
-    g.snd.spatialBreath(Math.sign(x - g.player.pos.x));
-    g.snd.sample("wet-cloth-drag", { vol: 0.24, pan: Math.sign(x - g.player.pos.x), wet: 0.35 });
     this._setLive({ life: 6.5, step: () => {}, end: () => g.appar.hide() });
   }
 
@@ -152,9 +150,6 @@ export class DreadDirector {
   _crawl() {
     const s = this._firstStalker();
     s.dreadPose = pick(["crouch", "crawl", "lean", "kneel"]); s.dreadT = 9;
-    this.g.snd.spatialBreath(Math.random() < 0.5 ? -1 : 1);
-    this.g.snd.sample("wet-cloth-drag", { vol: 0.34, pan: rnd(-0.5, 0.5), wet: 0.4 });
-    setTimeout(() => this.g.snd.sample("joint-cracks", { vol: 0.32, pan: rnd(-0.7, 0.7) }), 850);
     this._setLive({ life: 9, step: () => {}, end: () => { s.dreadPose = ""; s.mesh.scale.set(1, 1, 1); } });
   }
 
@@ -163,7 +158,6 @@ export class DreadDirector {
     const g = this.g, s = this._firstStalker();
     const far = s.x < g.floor.len / 2 ? g.floor.len - 1.1 : 1.1;
     g.appar.show(far, null, 7.5);
-    g.snd.sample("distant-laugh", { vol: 0.26, pan: Math.sign(far - g.player.pos.x), wet: 0.55 });
     this._setLive({ life: 7.5, step: () => {}, end: () => g.appar.hide() });
   }
 

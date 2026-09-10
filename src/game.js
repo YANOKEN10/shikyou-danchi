@@ -472,7 +472,7 @@ export class Game {
 
     if (out.spotted && !this._spotFlag) {
       this._spotFlag = true;
-      this.snd.stinger("spotted");
+      // Ghost sightings are silent.
       this.ui.sayNow(S.CHASE_LINES[Math.floor(Math.random() * S.CHASE_LINES.length)]);
       this.ui.hit();
     }
@@ -643,7 +643,7 @@ export class Game {
     } else if (s === "turned") {
       const f = this.floor.fx.find((k) => k.kind === "turned");
       if (f) f.dolls.forEach((g2) => { g2.rotation.y = 0; });
-      this.snd.stinger();
+      // The visual reveal has no sting.
       this.ui.hit();
     } else if (s === "mirror") {
       const f = this.floor.fx.find((k) => k.kind === "mirror");
@@ -1100,7 +1100,7 @@ export class Game {
 
   _startChase() {
     this.state.flags.chase = true;
-    this.snd.stinger("chase");
+    // Begin the chase without an appearance sting.
     this.floor.lights.forEach((L) => { L.light.intensity = 0; L.dead = true; L.flicker = false; L.tube.material.color.setHex(0x121512); });
     this.snd.buzzOff();
     this.ui.sayNow("——廊下の灯りが、いっせいに落ちた。");

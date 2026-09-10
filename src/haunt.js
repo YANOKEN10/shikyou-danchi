@@ -199,7 +199,7 @@ export class Haunts {
         mat.opacity = Math.max(0, a) * peak;
         mesh.position.y = y0 + Math.min(1, e.t / 3.4) * rise;
         mesh.lookAt(g.camera.position.x, mesh.position.y, g.camera.position.z);
-        if (!sounded && e.t > 0.35) { sounded = true; g.snd.whisper(); }
+        if (!sounded && e.t > 0.35) { sounded = true; /* Silent apparition. */ }
       },
       end: () => {
         g.floor.group.remove(mesh);
@@ -219,7 +219,7 @@ export class Haunts {
     f.mesh.material.needsUpdate = true;
     f.ph = 0.0001;
     f.t = 22 + rnd(0, 12);
-    g.snd.mirrorRing();
+    // The mirror apparition is silent.
     this._add({ life: 2.1, step: () => {}, end: () => { f.mesh.material.map = oldMap; f.mesh.material.needsUpdate = true; } });
   }
 
