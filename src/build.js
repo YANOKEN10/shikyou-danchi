@@ -55,6 +55,8 @@ function generatedTexture(path, rx = 1, ry = 1) {
   tex.repeat.set(rx, ry);
   return tex;
 }
+const bathAtlas = generatedTexture('./assets/generated/bath-porcelain-tile-v1.png');
+function bathTexture(tile=false,floor=false){const t=bathAtlas.clone();t.repeat.set(.494,tile&&floor?.49:.99);t.offset.set(tile?.502:.002,.004);return t;}
 const entityAtlas = generatedTexture("./assets/entity-red-atlas.png");
 const generatedWall = generatedTexture("./assets/generated/wall-plaster-v2.png?v=20260906", 2, 1);
 const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 2, 2);
@@ -464,11 +466,21 @@ function commonWetArea(C) {
   makeFront(split, front, "トイレ");
   makeFront(back, split, "風呂");
 
-  // 便器は座面・ふた・タンクを分け、入口から用途が分かる形にする。
-  const toilet = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.29, 0.35, 16), mats.porcelain);
-  toilet.scale.z = 1.3; toilet.position.set(left + 0.58, 0.22, z0 - 0.88); C.g.add(toilet);
-  C.pb(0.5, 0.08, 0.58, mats.porcelain, left + 0.58, 0.43, z0 - 0.88);
-  C.pb(0.46, 0.65, 0.22, mats.porcelain, left + 0.58, 0.33, z0 - 0.49);
+  // Continuous ceramic shell curves over the rim and down inside the bowl.
+  const toilet=new THREE.Group();toilet.name='toilet';toilet.position.set(left+.58,.065,z0-.88);C.g.add(toilet);
+  const shellProfile=[[.15,0],[.18,.025],[.165,.16],[.20,.255],[.245,.32],[.248,.36],[.225,.377],
+    [.198,.36],[.175,.32],[.13,.22],[.07,.16],[0,.15]].map(([r,y])=>new THREE.Vector2(r,y));
+  const bowl=new THREE.Mesh(new THREE.LatheGeometry(shellProfile,64),mats.porcelain);bowl.scale.z=1.35;bowl.name='bowl';toilet.add(bowl);
+  const seat=new THREE.Mesh(new THREE.TorusGeometry(.218,.024,12,64),mats.porcelain);
+  seat.rotation.x=Math.PI/2;seat.scale.y=1.36;seat.position.y=.398;seat.name='seat';toilet.add(seat);
+  const water=new THREE.Mesh(new THREE.CircleGeometry(.08,40),new THREE.MeshStandardMaterial({color:0x637b78,roughness:.17}));
+  water.rotation.x=-Math.PI/2;water.scale.y=1.35;water.position.y=.17;toilet.add(water);
+  const tank=new THREE.Mesh(new THREE.BoxGeometry(.40,.49,.19),mats.porcelain);tank.position.set(0,.37,.30);toilet.add(tank);
+  const lidPivot=new THREE.Group();lidPivot.position.set(0,.408,.21);lidPivot.rotation.x=-.10;toilet.add(lidPivot);
+  const lid=new THREE.Mesh(new THREE.SphereGeometry(1,40,28),mats.porcelain);lid.scale.set(.235,.285,.019);lid.position.y=.265;lid.name='lid';lidPivot.add(lid);
+  const hinge=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.30,16),mats.porcelain);hinge.rotation.z=Math.PI/2;hinge.position.set(0,.408,.21);toilet.add(hinge);
+  const lever=new THREE.Mesh(new THREE.BoxGeometry(.07,.022,.028),mats.kitchenSteel);lever.position.set(.217,.54,.30);toilet.add(lever);
+  const supply=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.24,12),mats.kitchenSteel);supply.position.set(.20,.15,.30);toilet.add(supply);
   C.blk(left + 0.28, z0 - 1.22, left + 0.88, z0 - 0.4);
 
   // 狭いトイレほど鏡の中の奥行きが不自然に見えるため、便器の横に縦長の鏡を置く。
@@ -483,9 +495,17 @@ function commonWetArea(C) {
   const tubW = 0.9, tubD = 0.94, tubX = left + 0.55;
   // 浴槽が戸口まで張り出すとプレイヤー半径を含めた通路が消えるため、小型の深い浴槽を左奥へ寄せる。
   C.pb(tubW, 0.5, 0.08, mats.porcelain, tubX, 0.25, tubZ - tubD / 2);
+  C.pb(tubW, 0.5, 0.08, mats.porcelain, tubX, 0.25, tubZ + tubD / 2);
   C.pb(0.08, 0.5, tubD, mats.porcelain, tubX - tubW / 2, 0.25, tubZ);
   C.pb(0.08, 0.5, tubD, mats.porcelain, tubX + tubW / 2, 0.25, tubZ);
   C.pb(tubW, 0.12, tubD, mats.porcelain, tubX, 0.06, tubZ);
+  // A continuous rounded lip joins all four walls without open corner seams.
+  const rounded=(path,w,h,r)=>{const x=-w/2,y=-h/2;path.moveTo(x+r,y);path.lineTo(x+w-r,y);path.quadraticCurveTo(x+w,y,x+w,y+r);path.lineTo(x+w,y+h-r);path.quadraticCurveTo(x+w,y+h,x+w-r,y+h);path.lineTo(x+r,y+h);path.quadraticCurveTo(x,y+h,x,y+h-r);path.lineTo(x,y+r);path.quadraticCurveTo(x,y,x+r,y);};
+  const rimShape=new THREE.Shape();rounded(rimShape,tubW+.09,tubD+.09,.045);
+  const rimHole=new THREE.Path();rounded(rimHole,tubW-.085,tubD-.085,.04);rimShape.holes.push(rimHole);
+  const tubRim=new THREE.Mesh(new THREE.ExtrudeGeometry(rimShape,{depth:.025,bevelEnabled:true,bevelSize:.007,bevelThickness:.007,bevelSegments:3,steps:1,curveSegments:8}),mats.porcelain);
+  const rimUV=tubRim.geometry.attributes.uv;for(let i=0;i<rimUV.count;i++){rimUV.setXY(i,Math.max(0,Math.min(1,rimUV.getX(i)+.5)),Math.max(0,Math.min(1,rimUV.getY(i)+.5)));}rimUV.needsUpdate=true;
+  tubRim.rotation.x=-Math.PI/2;tubRim.position.set(tubX,.487,tubZ);tubRim.name='tub-rim';C.g.add(tubRim);
   // 右側に約70cmの洗い場を残し、扉から奥まで直線で歩ける当たり判定にする。
   C.blk(tubX - tubW / 2 - 0.04, tubZ - tubD / 2 - 0.04, tubX + tubW / 2 + 0.04, tubZ + tubD / 2 + 0.04);
 
@@ -1296,7 +1316,7 @@ export function buildFloor(scene, floorDef, opt) {
     stain: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false }),
     stainDark: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }),
     bag: lam({ color: 0x22242a }),
-    porcelain: lam({ map: interiorTexture(0, 0), color: 0xd0cbc0 }),
+    porcelain: new THREE.MeshStandardMaterial({ map: bathTexture(), color: 0xf1eee6, roughness:.3 }),
     kitchenSteel: lam({ map: interiorTexture(0, 1), color: 0xb2b0aa }),
     mirror: lam({ map: interiorTexture(2, 1), color: 0xa5aaa7 }),
     mirrorSmear: new THREE.MeshBasicMaterial({ map: TX.mirrorSmear(), transparent: true, depthWrite: false }),
@@ -1314,10 +1334,10 @@ export function buildFloor(scene, floorDef, opt) {
     newspaper: lam({ color: 0xbdb49c }),
     frostglass: lam({ color: 0x8f9aa0 }),
     entryFloor: lam({ map: roomSurfaceTexture(0, 0), color: 0xaaa18b }),
-    wetWall: lam({ map: roomSurfaceTexture(1, 0), color: 0x9d998c }),
+    wetWall: new THREE.MeshStandardMaterial({ map: bathTexture(true), color:0xd2d3ce,roughness:.72 }),
     kitchenWall: lam({ map: roomSurfaceTexture(1, 0), color: 0x8f8978 }),
     wetToiletFloor: lam({ map: roomSurfaceTexture(0, 1), color: 0x928575 }),
-    wetBathFloor: lam({ map: roomSurfaceTexture(1, 1), color: 0x77888a }),
+    wetBathFloor: new THREE.MeshStandardMaterial({ map:bathTexture(true,true), color:0xb6babc,roughness:.64 }),
     wetDoor: lam({ map: wetAreaTexture(0, 1), color: 0xb0b3ad, transparent: true, opacity: 0.88 }),
     roomLight: new THREE.MeshBasicMaterial({ map: wetAreaTexture(1, 1), color: 0xc1b798 }),
     rustedSteel: lam({ color: 0x4d4b46 }),
