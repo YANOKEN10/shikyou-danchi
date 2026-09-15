@@ -10,16 +10,11 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 // 人の気配だけは波形の細部が怖さを左右するため、生成済みの音声素材を使う。
 // 読み込みに失敗しても既存の合成音へ戻れるよう、URL はここで一元管理する。
 const SAMPLE_FILES = {
-  "wet-breath": "wet-breath.wav",
   "barefoot-follow": "barefoot-follow.wav",
   "wet-cloth-drag": "wet-cloth-drag.wav",
-  "joint-cracks": "joint-cracks.wav",
-  "mirror-scratch": "mirror-scratch.wav",
-  "drain-voice": "drain-voice.wav",
   "fridge-knocks": "fridge-knocks.wav",
   "pencil-writing": "pencil-writing.wav",
   "door-handle": "door-handle.wav",
-  "distant-laugh": "distant-laugh.wav",
 };
 
 export class Sound {
@@ -88,7 +83,7 @@ export class Sound {
 
   // 生成音声を左右と残響へ送る。未読込なら false を返し、呼び出し側が合成音へ戻れるようにする。
   sample(name, opt) {
-    if (!this.ready || this.muted) return false;
+    if (!Object.hasOwn(SAMPLE_FILES, name) || !this.ready || this.muted) return false;
     const buffer = this.samples.get(name);
     if (!buffer) return false;
     const o = opt || {}, ctx = this.ctx;
@@ -202,16 +197,9 @@ export class Sound {
       ["遠くの物音", () => this.thud(true)],
       ["戸を叩く音", () => this.knock(3)],
       ["廊下を通る足音", () => this.passBy()],
-      ["鏡が鳴る", () => this.mirrorRing()],
-      ["ささやき", () => this.whisper()],
-      ["見つかったとき", () => this.stinger()],
-      ["濡れた呼吸", () => this.sample("wet-breath", { vol: 0.46 })],
       ["裸足でついてくる", () => this.sample("barefoot-follow", { vol: 0.4 })],
       ["濡れた服を引きずる", () => this.sample("wet-cloth-drag", { vol: 0.38 })],
-      ["関節が鳴る", () => this.sample("joint-cracks", { vol: 0.38 })],
-      ["排水口の声", () => this.sample("drain-voice", { vol: 0.34 })],
       ["冷蔵庫の内側", () => this.sample("fridge-knocks", { vol: 0.4 })],
-      ["遠くの笑い声", () => this.sample("distant-laugh", { vol: 0.34 })],
     ];
   }
 
@@ -411,8 +399,7 @@ export class Sound {
 
   // 画面の操作音。乾いた小さな打音だけ（音程を持たせない）
   ui() {
-    this.burst({ freq: 1100, q: 3.5, vol: 0.10, dur: 0.022, wet: 0.12 });
-    this.burst({ freq: 300, q: 2.2, vol: 0.07, dur: 0.03, wet: 0.12 });
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   // 遠くの物音
@@ -493,14 +480,7 @@ export class Sound {
   // 鏡が、澄んだ音で鳴る
   // 鏡が鳴る。わずかにずれた音を重ねて、耳ざわりな「うなり」を作る
   mirrorRing() {
-    this.sample("mirror-scratch", { vol: 0.26, pan: rnd(-0.25, 0.25), wet: 0.45 });
-    [[213, 0.085], [219.7, 0.075], [436, 0.032]].forEach(([f, v], i) => {
-      this.tone({
-        type: "sine", f0: f, f1: f * 0.968,
-        vol: v, dur: 3.2 + i * 0.7, atk: 0.35, wet: 1.6,
-      });
-    });
-    this.burst({ freq: 2500, q: 7, vol: 0.05, dur: 0.6, atk: 0.25, wet: 1.4 });
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   // 仏壇や机などの古い木部。紙の音を流用すると触った物と一致しないため、鈍い木の反響にする。
@@ -571,11 +551,7 @@ export class Sound {
     gain.gain.linearRampToValueAtTime(0.018, t + 8.5);
     src.connect(filter); filter.connect(gain); gain.connect(this.master);
     src.start(t, Math.random()); src.stop(t + 9);
-    if (best) {
-      [4.9, 5.55].forEach((delay, i) => setTimeout(() => {
-        this.tone({ type: "sine", f0: i ? 392 : 294, f1: i ? 440 : 330, vol: 0.075, dur: 1.6, atk: 0.18, wet: 1.15 });
-      }, delay * 1000));
-    }
+
   }
   // 蛍光灯が切れる
   tubePop() {
@@ -609,62 +585,12 @@ export class Sound {
 
   /* ---------- 驚かす音 ---------- */
 
-  stinger(kind) {
-    if (!this.ready || this.muted) return;
-    const ctx = this.ctx, t = this.t;
-
-    // 目前・追跡開始・捕獲で音色を分け、どの恐怖でも同じ映画的な効果音にならないようにする。
-    const close = kind === "close", chase = kind === "chase", caught = kind === "caught";
-    if (close) {
-      this.sample("joint-cracks", { vol: 0.42, pan: rnd(-0.18, 0.18), wet: 0.16, rate: 0.84 });
-      this.sample("wet-breath", { vol: 0.5, pan: rnd(-0.12, 0.12), wet: 0.2, rate: 0.92 });
-    }
-    [0, 1, 2].forEach((i) => {
-      const osc = ctx.createOscillator();
-      osc.type = "sawtooth";
-      const base = close ? [410, 437, 622][i] : chase ? [690, 733, 978][i] : caught ? [190, 207, 286][i] : [880, 932, 1245][i];
-      osc.frequency.setValueAtTime(base * rnd(0.98, 1.02), t);
-      osc.frequency.exponentialRampToValueAtTime(base * 0.35, t + 1.1);
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(close ? 0.065 : caught ? 0.14 : 0.095, t + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
-      const f = ctx.createBiquadFilter();
-      f.type = "lowpass"; f.frequency.value = 5200;
-      osc.connect(f); f.connect(g);
-      this._out(g, 1.2);
-      osc.start(t); osc.stop(t + 1.25);
-    });
-
-    this.burst({ freq: close ? 105 : caught ? 72 : 200, q: 0.4, vol: caught ? 0.38 : 0.22, dur: close ? 0.28 : 0.5, wet: close ? 0.35 : 1.4 });
-    this.tone({ type: "sine", f0: caught ? 38 : chase ? 49 : 55, f1: caught ? 17 : 28, vol: close ? 0.2 : 0.30, dur: close ? 0.65 : 1.4, wet: close ? 0.35 : 1.0 });
+  stinger() {
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   whisper() {
-    if (!this.ready || this.muted) return;
-    const ctx = this.ctx, t = this.t;
-    const src = this._src(false);
-    src.playbackRate.value = rnd(0.7, 1.0);
-
-    const f = ctx.createBiquadFilter();
-    f.type = "bandpass"; f.frequency.value = rnd(900, 1600); f.Q.value = 3.5;
-
-    // 口の動きらしい揺れ
-    const lfo = ctx.createOscillator();
-    lfo.type = "sine"; lfo.frequency.value = rnd(4, 9);
-    const lg = ctx.createGain(); lg.gain.value = 400;
-    lfo.connect(lg); lg.connect(f.frequency);
-
-    const g = ctx.createGain();
-    const dur = rnd(0.6, 1.3);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.34, t + 0.15);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-
-    src.connect(f); f.connect(g);
-    this._out(g, 1.3);
-    src.start(t, Math.random()); lfo.start(t);
-    src.stop(t + dur + 0.1); lfo.stop(t + dur + 0.1);
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   /* ---------- 鳴りっぱなしの音 ---------- */
@@ -697,22 +623,9 @@ export class Sound {
     setTimeout(() => { try { a.src.stop(); a.lfo.stop(); } catch (e) {} }, 1400);
   }
 
-  // 部屋の中の空気（低く、耳に残る唸り）
+  // 人工的な室内低音は鳴らさない。
   roomToneOn() {
-    if (!this.ready || this._room) return;
-    const ctx = this.ctx;
-    const osc = ctx.createOscillator(); osc.type = "sine"; osc.frequency.value = 52;
-    const osc2 = ctx.createOscillator(); osc2.type = "sine"; osc2.frequency.value = 78.5;
-    const src = this._src(true);
-    const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 240; f.Q.value = 0.6;
-    const ng = ctx.createGain(); ng.gain.value = 0.05;
-    src.connect(f); f.connect(ng);
-    const g = ctx.createGain(); g.gain.value = 0.0001;
-    osc.connect(g); osc2.connect(g); ng.connect(g);
-    g.connect(this.master);
-    osc.start(); osc2.start(); src.start();
-    g.gain.setTargetAtTime(0.075, this.t, 0.9);
-    this._room = { osc, osc2, src, g };
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   roomToneOff() {
@@ -789,53 +702,20 @@ export class Sound {
   // 心臓の音。緊張(0〜1)で速さと大きさが変わる
   setTension(x) {
     this.tension = clamp(x, 0, 1);
-    if (!this.ready) return;
-    if (this.tension > 0.12 && !this._heart) this._startHeart();
-    if (this.tension <= 0.12 && this._heart) this._stopHeart();
+    this._stopHeart();
   }
 
   // 距離だけで心音を鳴らすと、まだ安全な巡回中まで追跡音楽になる。
   // 発見・目前・室内をまとめて受け取り、同じ場所でも状況に合う音層だけを残す。
-  setThreat(x, opt) {
-    const o = opt || {};
-    const close = Boolean(o.near || o.closeApparition);
-    this.tension = close ? Math.max(0.86, clamp(x, 0, 1)) : clamp(x, 0, 1);
-    if (!this.ready) return;
-    const hunting = Boolean(o.hunting);
-    this._threatMode = close ? "close" : hunting ? "hunt" : this.tension > 0.34 ? "uneasy" : "calm";
-    if ((hunting || close) && this.tension > 0.4 && !this._heart) this._startHeart();
-    if ((!hunting && !close) || this.tension <= 0.28) this._stopHeart();
-    if (close) this.breathOn(o.pan || 0); else this.breathOff();
-    if (hunting || close) this._dangerOn(close ? 1 : Math.max(0.45, this.tension));
-    else this._dangerOff();
-    // 敵が近いときは風・室内低音・蛍光灯を引かせ、居場所を示す呼吸と追跡音を聞き取れるようにする。
-    const duck = close ? 0.16 : hunting ? 0.34 : 1;
-    if (this._amb) this._amb.g.gain.setTargetAtTime(0.09 * duck, this.t, 0.18);
-    if (this._room) this._room.g.gain.setTargetAtTime(0.075 * duck, this.t, 0.18);
-    if (this._buzz) this._buzz.g.gain.setTargetAtTime(close ? 0.004 : hunting ? 0.01 : this._buzz.level, this.t, 0.15);
+  setThreat(x) {
+    this.tension = clamp(x, 0, 1);
+    this._threatMode = "calm";
+    this._stopHeart(); this.breathOff(); this._dangerOff();
   }
 
   // 追跡時だけ鳴る低い圧迫音。旋律ではなく、速度を急かす不規則な脈動にする。
-  _dangerOn(level) {
-    if (!this.ready) return;
-    if (this._danger) {
-      this._danger.g.gain.setTargetAtTime(0.035 + level * 0.075, this.t, 0.12);
-      this._danger.lfoGain.gain.setTargetAtTime(0.018 + level * 0.035, this.t, 0.12);
-      return;
-    }
-    const ctx = this.ctx;
-    const a = ctx.createOscillator(); a.type = "sine"; a.frequency.value = 31;
-    const b = ctx.createOscillator(); b.type = "triangle"; b.frequency.value = 46.7;
-    const src = this._src(true);
-    const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 145;
-    const g = ctx.createGain(); g.gain.value = 0.0001;
-    const lfo = ctx.createOscillator(); lfo.type = "sawtooth"; lfo.frequency.value = 1.35;
-    const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.02;
-    a.connect(g); b.connect(g); src.connect(filter); filter.connect(g);
-    lfo.connect(lfoGain); lfoGain.connect(g.gain); g.connect(this.master);
-    a.start(); b.start(); src.start(); lfo.start();
-    g.gain.setTargetAtTime(0.035 + level * 0.075, this.t, 0.12);
-    this._danger = { a, b, src, lfo, lfoGain, g };
+  _dangerOn() {
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   _dangerOff() {
@@ -845,18 +725,7 @@ export class Sound {
     setTimeout(() => { try { d.a.stop(); d.b.stop(); d.src.stop(); d.lfo.stop(); } catch (e) {} }, 900);
   }
   _startHeart() {
-    const self = this;
-    let alive = true;
-    const beat = () => {
-      if (!alive || !self.ready || !self._heart) return;
-      const v = 0.06 + self.tension * 0.22;
-      self.tone({ type: "sine", f0: 62, f1: 40, vol: v, dur: 0.16, wet: 0.2 });
-      setTimeout(() => self.tone({ type: "sine", f0: 54, f1: 34, vol: v * 0.66, dur: 0.14, wet: 0.2 }), 150);
-      const bpm = 58 + self.tension * 78;
-      self._heart.timer = setTimeout(beat, (60000 / bpm));
-    };
-    this._heart = { stop: () => { alive = false; }, timer: 0 };
-    beat();
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   _stopHeart() {
@@ -867,21 +736,8 @@ export class Sound {
   }
 
   // すぐ後ろにいるときの息づかい
-  breathOn(pan) {
-    if (!this.ready) return;
-    if (this._breath) { this._breath.pan = clamp(pan || 0, -1, 1); return; }
-    const self = this;
-    let alive = true;
-    const cycle = () => {
-      if (!alive || !self._breath) return;
-      // 目前では生成ノイズより濡れた実録素材を優先し、左右位置も敵の側へ固定する。
-      if (!self.sample("wet-breath", { vol: 0.52, pan: self._breath.pan, wet: 0.22, rate: rnd(0.9, 1.04) })) {
-        self.burst({ freq: rnd(430, 680), q: 0.8, vol: 0.14, dur: 0.58, atk: 0.2, wet: 0.45, rate: 0.52 });
-      }
-      self._breath.timer = setTimeout(cycle, rnd(1550, 2250));
-    };
-    this._breath = { stop: () => { alive = false; }, timer: 0, pan: clamp(pan || 0, -1, 1) };
-    cycle();
+  breathOn() {
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   breathOff() {
@@ -892,25 +748,8 @@ export class Sound {
   }
 
   // 見えている姿と反対側から呼吸を鳴らすため、短い音だけ左右へ振り分ける。
-  spatialBreath(pan) {
-    if (!this.ready || this.muted) return;
-    // 実際の濡れた呼吸が使えるときは、それだけにして音量の重なりを避ける。
-    if (this.sample("wet-breath", { vol: 0.48, pan: pan || 0, wet: 0.32 })) return;
-    const ctx = this.ctx, t = this.t;
-    const src = this._src(false);
-    src.playbackRate.value = 0.55;
-    const f = ctx.createBiquadFilter();
-    f.type = "bandpass"; f.frequency.value = 620; f.Q.value = 0.8;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.18);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.72);
-    src.connect(f); f.connect(gain);
-    if (ctx.createStereoPanner) {
-      const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan || 0));
-      gain.connect(p); p.connect(this.master);
-    } else gain.connect(this.master);
-    src.start(t); src.stop(t + 0.75);
+  spatialBreath() {
+    // Only everyday physical sounds are used, including during ghost encounters.
   }
 
   allOff() {
