@@ -55,6 +55,7 @@ function generatedTexture(path, rx = 1, ry = 1) {
   tex.repeat.set(rx, ry);
   return tex;
 }
+const dresserAtlas=generatedTexture('./assets/generated/dresser-walnut-v1.png');
 const bathAtlas = generatedTexture('./assets/generated/bath-porcelain-tile-v1.png');
 function bathTexture(tile=false,floor=false){const t=bathAtlas.clone();t.repeat.set(.494,tile&&floor?.49:.99);t.offset.set(tile?.502:.002,.004);return t;}
 const entityAtlas = generatedTexture("./assets/entity-red-atlas.png");
@@ -511,15 +512,6 @@ function commonWetArea(C) {
 
   // 浴室の鏡は洗い場から正面に見える位置へ置き、見続けたときだけ人影を出す。
   addWetMirror(C, left + 0.035, 1.35, z0 - 2.35, Math.PI / 2, 0.62, 0.76, "風呂の鏡を覗く");
-  const drain = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.012, 16), mats.drain);
-  drain.position.set(right - 0.34, 0.075, z0 - 2.35); C.g.add(drain);
-  // 太い立体線は虫の脚に見えたため、濡れた束と細い毛を一枚の床デカールで表現する。
-  const hair = plane(0.92, 0.92, mats.wetHair);
-  hair.rotation.x = -Math.PI / 2;
-  hair.rotation.z = -0.28;
-  hair.position.set(right - 0.34, 0.088, z0 - 2.35);
-  C.g.add(hair);
-
   // 右壁を共通の台所にし、部屋の種類にかかわらず流しと冷蔵庫を持たせる。
   // 冷蔵庫と流しの背面だけを古いタイルにし、居室の壁紙へ水汚れが唐突に続かないよう区切る。
   C.wall(3.35, 1.82, mats.kitchenWall, x1 - 0.025, 1.03, z0 - 1.82, -Math.PI / 2);
@@ -659,8 +651,7 @@ function furnishHome(C) {
       part(w-.06,.05,d*.6,m.shade,0,.56,d*.15);
       for(const xx of [-w/2+.08,w/2-.08])for(const zz of [-d/2+.1,d/2-.1])part(.09,.3,.09,m.darkwood,xx,.15,zz);
     } else if(kind==='dresser') {
-      part(w,1.28,d,m.wood,0,.66,0);part(w+.06,.06,d+.04,m.darkwood,0,1.33,0);
-      for(let i=0;i<4;i++){part(w-.08,.27,.035,m.darkwood,0,.2+i*.3,d/2+.015);for(const xx of [-.23,.23])part(.14,.025,.045,m.steel,xx,.2+i*.3,d/2+.05);}
+      C.g.remove(g);buildDresser(C,w,1.30,d,x,z);
     } else {
       const h=kind==='desk'?.74:.48;
       part(w,.065,d,m.wood,0,h,0);
@@ -670,6 +661,21 @@ function furnishHome(C) {
     C.blk(x-w/2,z-d/2,x+w/2,z+d/2);
   }
 }
+function buildDresser(C,w,h,d,x,z) {
+  const g=new THREE.Group();g.position.set(x,0,z);g.userData.furniture='dresser';g.userData.roomNo=C.unit.no;C.g.add(g);
+  const wood=dresserAtlas.clone();wood.repeat.set(.48,.98);wood.offset.set(.52,.01);
+  const side=new THREE.MeshStandardMaterial({map:wood,roughness:.72,color:0xe0cebb});
+  const body=box(w,h-.05,d,side);body.position.y=h/2;g.add(body);
+  const cap=box(w+.04,.055,d+.035,side);cap.position.y=h+.015;g.add(cap);
+  for(let i=0;i<4;i++){
+    const map=dresserAtlas.clone();map.repeat.set(.494,.23);map.offset.set(.006,.016+i*.245);
+    const faceMat=new THREE.MeshStandardMaterial({map,roughness:.65,color:0xf0e6d8});
+    const drawer=box(w-.06,(h-.12)/4-.012,.045,[side,side,side,side,faceMat,side]);
+    drawer.position.set(0,.07+(i+.5)*(h-.12)/4,d/2+.014);g.add(drawer);
+  }
+  return g;
+}
+
 function buildMemoProp(C, id, px, pz) {
   const g = new THREE.Group();
   const isLetter = id === "m5" || id === "m3draft";
@@ -698,7 +704,7 @@ const FURNISH = {
     // 靴箱の上。ここに懐中電灯や鍵を置きます
     C.itemAt = [x1 - 0.6, z0 - 1.93];
     // 押し入れ
-    C.pb(1.8, H, 0.5, mats.wood, x1 - 1.1, H / 2, z1 + 0.26);
+    buildDresser(C,1.8,H,.5,x1-1.1,z1+.26);
     C.blk(x1 - 2.0, z1, x1 - 0.2, z1 + 0.5);
     // ちゃぶ台
     lowTable(C, dx, zMid - 1.4);
@@ -1068,7 +1074,7 @@ const FURNISH = {
     C.g.add(bulge);
     C.blk(x1 - 1.7, z1 + 0.25, x1 - 0.5, z1 + 2.15);
     C.fx.push({ kind: "bulge", mesh: bulge, y0: 0.15 });
-    C.pb(1.8, C.H, 0.5, mats.wood, x0 + 1.1, C.H / 2, z1 + 0.26);
+    buildDresser(C,1.8,C.H,.5,x0+1.1,z1+.26);
     C.blk(x0 + 0.2, z1, x0 + 2.0, z1 + 0.5);
     C.detailAt = [dx - 0.9, zMid - 1.6];
   },
@@ -1081,7 +1087,7 @@ const FURNISH = {
     C.blk(x0 + 0.4, z1 + 0.5, x0 + 1.6, z1 + 1.1);
     C.goalAt = [x0 + 1.0, z1 + 0.8];
     // 押し入れ・ちゃぶ台・座布団
-    C.pb(1.8, H, 0.5, mats.wood, x1 - 1.1, H / 2, z1 + 0.26);
+    buildDresser(C,1.8,H,.5,x1-1.1,z1+.26);
     C.blk(x1 - 2.0, z1, x1 - 0.2, z1 + 0.5);
     lowTable(C, dx, zMid - 1.5);
     C.pb(0.6, 0.09, 0.6, mats.cushion, dx - 0.75, 0.05, zMid - 1.5);
