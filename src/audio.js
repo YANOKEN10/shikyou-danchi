@@ -334,31 +334,15 @@ export class Sound {
   /* ---------- もの ---------- */
 
   doorOpen() {
-    // 蝶番のきしみ
     if (!this.ready || this.muted) return;
-    const ctx = this.ctx, t = this.t;
-    const osc = ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(rnd(190, 260), t);
-    osc.frequency.linearRampToValueAtTime(rnd(320, 430), t + 0.7);
-
-    const f = ctx.createBiquadFilter();
-    f.type = "bandpass"; f.frequency.value = 900; f.Q.value = 7;
-
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = rnd(11, 19);
-    const lg = ctx.createGain(); lg.gain.value = 40;
-    lfo.connect(lg); lg.connect(osc.frequency);
-
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.42, t + 0.12);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
-
-    osc.connect(f); f.connect(g);
-    this._out(g, 0.9);
-    osc.start(t); lfo.start(t);
-    osc.stop(t + 0.85); lfo.stop(t + 0.85);
+    // Dry latch contact, then quiet friction; no pitched oscillator or vibrato.
+    this.burst({ freq: 1700, q: 0.7, vol: 0.075, dur: 0.025, wet: 0.10 });
+    this.burst({ type: "lowpass", freq: 420, q: 0.5, vol: 0.06, dur: 0.045, wet: 0.08 });
+    setTimeout(() => {
+      this.burst({ freq: 950, q: 0.6, vol: 0.035, atk: 0.035, dur: 0.24, wet: 0.12 });
+      this.burst({ type: "lowpass", freq: 310, q: 0.5, vol: 0.045, atk: 0.045, dur: 0.30, wet: 0.10 });
+    }, 65);
+    setTimeout(() => this.burst({ freq: 1350, q: 0.7, vol: 0.025, dur: 0.028, wet: 0.08 }), 340);
   }
 
   doorShut() {
