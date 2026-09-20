@@ -75,7 +75,7 @@ export function showOnboarding() {
   device.value = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /Android/.test(ua) ? 'android' : 'desktop';
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   const instructions = {
-    ios: '<ol><li>Safariでこのゲームを開きます。</li><li><span class="welcome-phrase">共有ボタンを押します。</span><br>四角から上向き矢印のマークです。見当たらないときはメニュー内を確認します。</li><li><span class="welcome-phrase">「ホーム画面に追加」</span>を選び、<span class="welcome-phrase">「追加」を押します。</span><br><span class="welcome-phrase">「Webアプリとして開く」</span>が表示されたらオンにします。</li></ol>',
+    ios: '<ol><li>Safariでこのゲームを開きます。</li><li><span class="welcome-phrase">共有ボタンを押します。</span><br><span class="welcome-phrase">四角から上向き矢印の</span><span class="welcome-phrase">マークです。</span><br><span class="welcome-phrase">見当たらないときは</span><span class="welcome-phrase">メニュー内を確認します。</span></li><li><span class="welcome-phrase">「ホーム画面に追加」</span>を選び、<span class="welcome-phrase">「追加」を押します。</span><br><span class="welcome-phrase">「Webアプリとして開く」</span><span class="welcome-phrase">が表示されたら</span><span class="welcome-phrase">オンにします。</span></li></ol>',
     android: '<ol><li>Chromeでこのゲームを開きます。</li><li>右上の「⋮」メニューを開きます。</li><li><span class="welcome-phrase">「ホーム画面に追加」</span>を選びます。表示が異なる場合は「インストールしてショートカットを作成」を選び、案内に沿って追加します。</li></ol>',
     desktop: '<ol><li>ChromeまたはEdgeでこのゲームを開きます。</li><li>ブラウザーのメニューから、アプリのインストールやショートカットの作成を選びます。</li><li>画面の案内に沿って追加します。</li></ol>'
   };
