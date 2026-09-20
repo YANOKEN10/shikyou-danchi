@@ -1,0 +1,3 @@
+// 管理ページ専用。個人情報を返さず登録数だけを集計します。
+const {list}=require('@vercel/blob');
+module.exports=async(req,res)=>{res.setHeader('Cache-Control','no-store');if(req.method!=='GET')return res.status(405).end();const key=process.env.STATS_READ_KEY;if(!key||req.headers.authorization!=='Bearer '+key)return res.status(401).end();try{let count=0,cursor;do{const r=await list({prefix:"sk/u/",limit:1000,cursor});count+=r.blobs.filter(b=>/\/[a-f0-9]{64}\.json$/.test(b.pathname)).length;cursor=r.hasMore?r.cursor:undefined;if(r.hasMore&&!cursor)throw Error('incomplete');}while(cursor);return res.status(200).json({registered:count,updatedAt:Date.now()});}catch{return res.status(503).json({error:'unavailable'})}};
