@@ -1,3 +1,4 @@
+import { showOnboarding } from "./onboarding.js";
 // ============================================================
 //  入り口
 //   1. ログイン画面（メールは任意。名前でもメールでもログインできます）
@@ -406,6 +407,7 @@ $("codeIn").addEventListener("input", () => {
   $("gSub").textContent = SUB;
 
   // 券が生きていれば、そのまま入る
+  showOnboarding();
   const ok = await cloud.restore();
   if (ok) {
     updateWho();
