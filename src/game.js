@@ -359,6 +359,8 @@ export class Game {
       this.state.seconds += dt;
       this.floorTime += dt;
       this._step(dt);
+    } else {
+      this.snd.backgroundOff();
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -537,6 +539,7 @@ export class Game {
       s.mesh.visible = false;
     });
     this.appar.show(x, z, sec, opt);
+    if (opt && opt.pose === "lean") this.snd.suddenTerror();
     return true;
   }
 
@@ -647,7 +650,7 @@ export class Game {
       this.ui.hit();
     } else if (s === "mirror") {
       const f = this.floor.fx.find((k) => k.kind === "mirror");
-      if (f) { f.ph = 0.0001; f.t = 14 + Math.random() * 14; }
+      if (f) { f.ph = 0.0001; f.t = 14 + Math.random() * 14; this.snd.suddenTerror(); }
       this.snd.whisper();
     } else if (s === "static") {
       const f = this.floor.fx.find((k) => k.kind === "static");
@@ -684,7 +687,7 @@ export class Game {
           if (f.t <= 0) {
             f.ph = 0.0001;
             f.t = 16 + Math.random() * 20;
-            this.snd.mirrorRing();
+            this.snd.suddenTerror();
             this.snd.whisper();
           }
         }
@@ -778,7 +781,7 @@ export class Game {
       // 顔そのものが模型の中心より前へ張り出すため、中心を少し離しても表面は旧版より近く見える。
       if (this._showApparition(x, z, 4.2,
         { mode: "approach", speed: 0.16, stopDistance: 0.40, scale: 1.55, pose: "lean" })) {
-        // 出現と同時の作り物めいた効果音は鳴らさず、目の前にいる事実そのものを驚きにする。
+        // 音は _showApparition の出現成功時に一度だけ鳴らす。
         this.ui.hit();
         this.apparCooldown = 28 + Math.random() * 24;
       }
@@ -1054,6 +1057,7 @@ export class Game {
   async _goUp() {
     const n = this.state.floor;
     this.paused = true;
+    this.snd.backgroundOff();
     await this._stairWalk(true);
 
     // 四階のループ（母の手紙を読むまで、上っても四階に出る）
@@ -1077,6 +1081,7 @@ export class Game {
   async _goDown() {
     const n = this.state.floor;
     this.paused = true;
+    this.snd.backgroundOff();
     await this._stairWalk(false);
     await this.loadFloor(Math.max(1, n - 1), 0);
     await this.ui.fade(0, 1.1);
@@ -1118,6 +1123,7 @@ export class Game {
   }
   async _escape() {
     this.paused = true;
+    this.snd.backgroundOff();
     this.snd.allOff();
     await this.ui.fade(1, 1.0);
     this.running = false;
@@ -1199,6 +1205,7 @@ export class Game {
   /* ---------------- 帳面・ポーズ ---------------- */
 
   _openBook() {
+    this.snd.backgroundOff();
     this.player.unlock();
     this.ui.showBook({
       items: this.state.items, spare: this.player.spare, memos: this.state.memos,
@@ -1208,6 +1215,7 @@ export class Game {
   // custom を渡すと、小休止の中身を差し替えます（アカウント設定・確認など）
   doPause(custom) {
     this.paused = true;
+    this.snd.backgroundOff();
     this.player.unlock();
     this.snd.breathOff();
 

@@ -15,6 +15,9 @@ const SAMPLE_FILES = {
   "fridge-knocks": "fridge-knocks.wav",
   "pencil-writing": "pencil-writing.wav",
   "door-handle": "door-handle.wav",
+  "sudden-terror": "sudden-terror.wav",
+  "insane-pursuit": "insane-pursuit.mp3",
+  "ghost-footsteps": "ghost-footsteps.mp3",
 };
 
 export class Sound {
@@ -175,6 +178,7 @@ export class Sound {
   // 音の一覧（小休止の「音のたしかめ」で使います）
   catalog() {
     return [
+      ["突然の出現（Sudden Terror）", () => this.suddenTerror()],
       ["足音（歩く）", () => this.step("walk", true)],
       ["足音（走る）", () => this.step("run", true)],
       ["足音（しゃがむ）", () => this.step("crouch", true)],
@@ -691,7 +695,9 @@ export class Sound {
 
   // 距離だけで心音を鳴らすと、まだ安全な巡回中まで追跡音楽になる。
   // 発見・目前・室内をまとめて受け取り、同じ場所でも状況に合う音層だけを残す。
-  setThreat(x) {
+  setThreat(x, state = {}) {
+    if (state.hunting) { this.normalMusicOff(); this.pursuitOn(); }
+    else { this.pursuitOff(); this.normalMusicOn(); }
     this.tension = clamp(x, 0, 1);
     this._threatMode = "calm";
     this._stopHeart(); this.breathOff(); this._dangerOff();
@@ -736,7 +742,70 @@ export class Sound {
     // Only everyday physical sounds are used, including during ghost encounters.
   }
 
+  // 添付素材をそのまま使用。出現一回につき一度だけ鳴らす。
+  suddenTerror() {
+    if (this.t < (this._suddenUntil || 0)) return false;
+    const played = this.sample("sudden-terror", { vol: 0.48, wet: 0 });
+    if (played) this._suddenUntil = this.t + this.samples.get("sudden-terror").duration;
+    return played;
+  }
+
+  pursuitOn() {
+    if (this._pursuit || !this.ready || this.muted) return;
+    const buffer = this.samples.get("insane-pursuit");
+    if (!buffer) return; // 次の追跡フレームで再試行。遅れて場面外で鳴らさない。
+    const src = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    src.buffer = buffer;
+    src.loop = true;
+    gain.gain.setValueAtTime(0, this.t);
+    gain.gain.linearRampToValueAtTime(0.28, this.t + 0.3);
+    src.connect(gain); gain.connect(this.master);
+    src.onended = () => { src.disconnect(); gain.disconnect(); };
+    src.start();
+    this._pursuit = { src, gain };
+  }
+
+  pursuitOff() {
+    if (!this._pursuit) return;
+    const { src, gain } = this._pursuit;
+    this._pursuit = null;
+    gain.gain.cancelScheduledValues(this.t);
+    gain.gain.setTargetAtTime(0, this.t, 0.08);
+    src.stop(this.t + 0.4);
+  }
+
+  normalMusicOn() {
+    if (this._normalMusic || !this.ready || this.muted) return;
+    const buffer = this.samples.get("ghost-footsteps");
+    if (!buffer) return;
+    const src = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    src.buffer = buffer; src.loop = true;
+    gain.gain.setValueAtTime(0, this.t);
+    gain.gain.linearRampToValueAtTime(0.22, this.t + 0.5);
+    src.connect(gain); gain.connect(this.master);
+    src.onended = () => { src.disconnect(); gain.disconnect(); };
+    src.start();
+    this._normalMusic = { src, gain };
+  }
+
+  normalMusicOff() {
+    if (!this._normalMusic) return;
+    const { src, gain } = this._normalMusic;
+    this._normalMusic = null;
+    gain.gain.cancelScheduledValues(this.t);
+    gain.gain.setTargetAtTime(0, this.t, 0.08);
+    src.stop(this.t + 0.4);
+  }
+
+  backgroundOff() {
+    this.pursuitOff();
+    this.normalMusicOff();
+  }
+
   allOff() {
+    this.backgroundOff();
     this.ambienceOff();
     this.buzzOff();
     this._stopHeart();
