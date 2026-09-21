@@ -483,7 +483,7 @@ export class Game {
     const tension = Math.min(1, out.tension + (this.state.flags.chase ? 0.35 : 0));
     // 平常・警戒・追跡・目前を音響側で分け、無関係な環境音が恐怖場面へ重ならないようにする。
     this.snd.setThreat(tension, {
-      hunting: Boolean(out.hunting || this.state.flags.chase),
+      hunting: Boolean(out.hunting),
       near: out.veryNear > 0.5,
       pan: out.nearPan || 0,
       closeApparition: this.appar.mesh.visible && this.appar.stopDistance <= 0.25,

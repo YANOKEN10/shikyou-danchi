@@ -85,7 +85,7 @@ export class Stalker {
     animateEntity(this.mesh,dt,this.moving);
     // 下階では上り階段から降りて現れる。暗転明けの猶予中は捕獲しない。
     this.mesh.position.set(this.x,this.cfg.fromStairs?Math.max(0,this.escapeDelay-1)*.6:0,this.z);
-    if(out){out.hunting=true;out.tension=Math.max(.45,1-dist/16);out.nearestDistance=dist;out.nearPan=Math.max(-1,Math.min(1,(this.x-player.pos.x)/5));out.veryNear=dist<3?1:0;
+    if(out){out.hunting=!player.inUnit;out.tension=Math.max(.45,1-dist/16);out.nearestDistance=dist;out.nearPan=Math.max(-1,Math.min(1,(this.x-player.pos.x)/5));out.veryNear=dist<3?1:0;
       if(!player.inUnit && this.escapeDelay<=0 && Math.hypot(this.x-player.pos.x,this.z-player.pos.z)<.45)out.caught=true;
     }
   }
@@ -266,7 +266,8 @@ export class Stalker {
         out.nearestDistance = dist;
         out.nearPan = Math.max(-1, Math.min(1, (this.x - player.pos.x) / 5));
       }
-      if (this.state === "hunt") out.hunting = true;
+      // 見失った後の内部 hunt 状態は、実際の追跡音楽に含めない。
+      if (this.state === "hunt" && !safe && this.mesh.visible) out.hunting = true;
     }
   }
 }
