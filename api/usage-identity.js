@@ -1,0 +1,2 @@
+const L=require('./_lib');
+module.exports=async(req,res)=>{res.setHeader('Cache-Control','no-store');if(req.method!=='GET')return res.status(405).end();try{const claim=L.readToken(L.bearer(req));if(!claim)return res.status(401).json({id:null});const u=await L.readUser(claim.id);return res.status(200).json({id:u?u.id:null,displayName:u?String(u.display||u.name||u.id).slice(0,40):null})}catch{return res.status(503).json({error:'unavailable'})}};
