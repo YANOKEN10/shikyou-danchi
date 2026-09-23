@@ -1,3 +1,5 @@
+import { addLanguagePicker } from './i18n.js';
+
 const KEY = 'shikyou:onboarding:v1';
 
 export function showOnboarding() {
@@ -34,6 +36,7 @@ export function showOnboarding() {
       <button type="button" id="welcome-back">戻る</button>
     </section>
     `;
+  addLanguagePicker(dialog);
   document.body.append(dialog);
   const $ = selector => dialog.querySelector(selector);
   const account = $('#welcome-account');

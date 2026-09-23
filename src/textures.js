@@ -1,3 +1,4 @@
+import { tr } from "./i18n.js";
 // ============================================================
 //  見た目のもと（テクスチャ）
 //   画像ファイルは使わず、その場で canvas に描いて作ります。
@@ -232,6 +233,7 @@ export function doorSteel(no) {
 
 // 掲示板の紙
 export function noticeBoard(lines) {
+  lines = lines.map(tr);
   const key = "notice:" + lines.join("|");
   return tex(key, 512, 384, (g, w, h) => {
     g.fillStyle = "#2a2723"; g.fillRect(0, 0, w, h);
@@ -245,10 +247,10 @@ export function noticeBoard(lines) {
     g.fillStyle = "#25231f";
     g.textAlign = "center"; g.textBaseline = "top";
     g.font = "bold 34px 'MS Gothic', serif";
-    g.fillText(lines[0] || "", w / 2, 58);
+    g.fillText(lines[0] || "", w / 2, 58, w - 32);
     g.font = "22px 'MS Gothic', serif";
     for (let i = 1; i < lines.length; i++) {
-      g.fillText(lines[i], w / 2, 116 + (i - 1) * 34);
+      g.fillText(lines[i], w / 2, 116 + (i - 1) * 34, w - 32);
     }
     // 画鋲
     g.fillStyle = "#6b6b6b";
@@ -270,7 +272,7 @@ export function floorPlate(n) {
     g.textAlign = "center"; g.textBaseline = "middle";
     g.fillText(String(n), w / 2, h / 2 + 6);
     g.font = "bold 30px 'MS Gothic', monospace";
-    g.fillText("階", w / 2 + 62, h / 2 + 66);
+    g.fillText(tr("階"), w / 2 + 62, h / 2 + 66);
     grain(g, w, h, 14);
   }, 1, 1);
 }
@@ -423,7 +425,7 @@ export function calendar() {
     g.fillStyle = "#e8e2d2";
     g.font = "bold 30px 'MS Gothic', serif";
     g.textAlign = "center"; g.textBaseline = "middle";
-    g.fillText("八月", w / 2, 28);
+    g.fillText(tr("八月"), w / 2, 28);
     g.fillStyle = "#3a3a3a";
     g.font = "13px 'MS Gothic', monospace";
     let n = 1;
@@ -502,7 +504,7 @@ export function scribble() {
   person(220, 148, 34, "#2a2a2a", false);   // この子だけ、顔がない
   g.fillStyle = "rgba(60,60,60,0.8)";
   g.font = "bold 20px 'MS Gothic', monospace";
-  g.fillText("かぞく", 16, 44);
+  g.fillText(tr("かぞく"), 16, 44);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   cache.set(key, t);
@@ -1028,6 +1030,7 @@ export function figure() {
 
 // 貼り紙
 export function poster(lines, tone) {
+  lines = lines.map(tr);
   const key = "poster:" + lines.join("|");
   return tex(key, 256, 320, (g, w, h) => {
     g.fillStyle = tone || "#ded6c0"; g.fillRect(0, 0, w, h);
@@ -1035,15 +1038,16 @@ export function poster(lines, tone) {
     g.fillStyle = "#26241f";
     g.textAlign = "center"; g.textBaseline = "top";
     g.font = "bold 26px 'MS Gothic', serif";
-    g.fillText(lines[0] || "", w / 2, 34);
+    g.fillText(lines[0] || "", w / 2, 34, w - 24);
     g.font = "19px 'MS Gothic', serif";
-    for (let i = 1; i < lines.length; i++) g.fillText(lines[i], w / 2, 82 + (i - 1) * 30);
+    for (let i = 1; i < lines.length; i++) g.fillText(lines[i], w / 2, 82 + (i - 1) * 30, w - 24);
     grain(g, w, h, 12);
   }, 1, 1);
 }
 
 // 壁の落書き（背景が透けるので、壁に重ねて貼ります）
 export function graffiti(text) {
+  text = tr(text);
   const key = "graffiti:" + text;
   if (cache.has(key)) return cache.get(key);
   const c = cv(512, 256);
@@ -1052,7 +1056,7 @@ export function graffiti(text) {
   g.font = "bold 30px 'MS Gothic', monospace";
   for (let i = 0; i < 6; i++) {
     g.fillStyle = "rgba(150,40,40," + (0.55 + Math.random() * 0.25).toFixed(2) + ")";
-    g.fillText(text, 8 + (i % 2) * 7, 40 + i * 38);
+    g.fillText(text, 8 + (i % 2) * 7, 40 + i * 38, 490);
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -1062,6 +1066,8 @@ export function graffiti(text) {
 
 // メモ用紙（読むときに全画面で出すもの）
 export function memoSheet(title, body) {
+  title = tr(title);
+  body = body.map(tr);
   const c = cv(700, 900);
   const g = c.getContext("2d");
   g.fillStyle = "#ded7c4"; g.fillRect(0, 0, 700, 900);
@@ -1071,9 +1077,9 @@ export function memoSheet(title, body) {
   g.fillStyle = "#22201c";
   g.textAlign = "left"; g.textBaseline = "alphabetic";
   g.font = "bold 34px 'MS Gothic', serif";
-  g.fillText(title, 60, 100);
+  g.fillText(title, 60, 100, 580);
   g.font = "26px 'MS Gothic', serif";
-  body.forEach((line, i) => g.fillText(line, 60, 178 + i * 42));
+  body.forEach((line, i) => g.fillText(line, 60, 178 + i * 42, 580));
   grain(g, 700, 900, 10);
   return c.toDataURL();
 }

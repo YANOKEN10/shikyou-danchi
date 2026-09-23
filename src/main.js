@@ -1,3 +1,4 @@
+import { initLocale, tr } from "./i18n.js";
 import { showOnboarding } from "./onboarding.js";
 // ============================================================
 //  入り口
@@ -11,6 +12,8 @@ import { Game } from "./game.js";
 import { Net } from "./net.js";
 import { Versus } from "./versus.js";
 import { TITLE, SUB, FLOORS, MEMO_ORDER } from "./story.js";
+
+initLocale();
 
 const $ = (id) => document.getElementById(id);
 
@@ -255,7 +258,7 @@ function lobbyMsg(text, kind) {
 }
 
 function myName() {
-  return (cloud.signedIn && cloud.display) || cloud.lastName || "プレイヤー";
+  return (cloud.signedIn && cloud.display) || cloud.lastName || tr("プレイヤー");
 }
 
 function drawRoster() {
@@ -267,6 +270,7 @@ function drawRoster() {
     const dot = document.createElement("i");
     dot.className = "dot";
     const nm = document.createElement("span");
+    nm.dataset.userContent = "";
     nm.textContent = r.name;
     const tag = document.createElement("span");
     tag.className = "tagm";

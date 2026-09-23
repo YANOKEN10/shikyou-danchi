@@ -3,6 +3,7 @@
 //   ・字幕、調べる案内、メモの全画面表示、持ち物、ポーズ、終幕
 //   ・3D の上に重ねた普通の HTML です
 // ============================================================
+import { tr, language } from "./i18n.js";
 import { MEMOS, MEMO_ORDER, ITEMS, HELP_PC, HELP_TOUCH } from "./story.js";
 
 const $ = (id) => document.getElementById(id);
@@ -34,7 +35,9 @@ export class UI {
 
   say(text, sec) {
     if (!text) return;
-    this.subQueue.push({ text, sec: sec || Math.max(2.2, text.length * 0.11) });
+    text = tr(text);
+    const readingTime = language === "en" ? Math.max(2.8, Math.min(14, text.split(/\s+/).length / 3.2)) : Math.max(2.2, text.length * 0.11);
+    this.subQueue.push({ text, sec: language === "en" ? Math.max(sec || 0, readingTime) : (sec || readingTime) });
     if (!this.subTimer && !this._gap) this._nextSub();
   }
 
@@ -68,9 +71,10 @@ export class UI {
   /* ---------- 調べる案内 ---------- */
 
   setPrompt(label) {
+    label = tr(label);
     const p = this.el.prompt;
     if (!label) { p.classList.remove("show"); return; }
-    p.textContent = label;
+    if (p.textContent !== label) p.textContent = label;
     p.classList.add("show");
   }
 
@@ -92,6 +96,7 @@ export class UI {
 
   // いま、すること
   setObjective(text) {
+    text = tr(text);
     const el = this.el.objective;
     if (!el) return;
     if (el.textContent !== (text || "")) el.textContent = text || "";
@@ -157,7 +162,7 @@ export class UI {
     this.el.readerBody.innerHTML = "";
     m.body.forEach((line) => {
       const p = document.createElement("p");
-      p.textContent = line;
+      p.textContent = tr(line);
       if (!line) p.className = "gap";
       this.el.readerBody.appendChild(p);
     });
@@ -282,7 +287,8 @@ export class UI {
       if (!line) p.className = "gap";
       wrap.appendChild(p);
       p.classList.add("in");
-      await new Promise((r) => setTimeout(r, line ? Math.max(600, line.length * 55) : 320));
+      const readingDelay = language === "en" ? Math.max(900, tr(line).split(/\s+/).length * 220) : Math.max(600, line.length * 55);
+      await new Promise((r) => setTimeout(r, line ? readingDelay : 320));
     }
 
     const st = document.createElement("div");
