@@ -443,6 +443,15 @@ function commonWetArea(C) {
   const front = z0 - 0.25, back = z0 - 3.55;
   const left = x0 + 0.12, right = x0 + 2.05;
   const doorW = 0.78;
+  // Close both ends and the unused strip up to the living-room partition.
+  for (const z of [front, back]) {
+    const wall = C.pb(right - x0 + .04, H, .10, mats.wetWall, (x0 + right) / 2, H / 2, z);
+    wall.name = 'wet-end-wall';
+    C.blk(x0, z - .05, right + .04, z + .05);
+  }
+  const infill = C.pb(.10, H, back - C.zMid + .08, mats.paper, right, H / 2, (back + C.zMid) / 2);
+  infill.name = 'wet-side-infill';
+  C.blk(right - .05, C.zMid - .04, right + .05, back + .04);
 
   // 水まわりを左へ寄せ、玄関から居室まで一直線に歩ける幅を中央に残す。
   const split = z0 - 1.88;
@@ -459,6 +468,7 @@ function commonWetArea(C) {
     C.pb(0.08, H, zb - gap1, mats.wetWall, right, H / 2, (gap1 + zb) / 2);
     C.blk(right - 0.04, za, right + 0.04, gap0);
     C.blk(right - 0.04, gap1, right + 0.04, zb);
+    C.pb(.08, H - 1.92, doorW, mats.wetWall, right, (H + 1.92) / 2, (gap0 + gap1) / 2);
     const dc = C.col.add(right - 0.05, gap0, right + 0.05, gap1, "fixtureDoor");
     // 戸口は正のZ方向へ続くため、閉状態では戸板も正のZへ伸ばして隙間を塞ぐ。
     hingedDoor(C, { x: right, z: gap0, w: doorW, h: 1.92, mat: mats.wetDoor, shut: -Math.PI / 2, opened: 0,
@@ -515,13 +525,18 @@ function commonWetArea(C) {
   // 右壁を共通の台所にし、部屋の種類にかかわらず流しと冷蔵庫を持たせる。
   // 冷蔵庫と流しの背面だけを古いタイルにし、居室の壁紙へ水汚れが唐突に続かないよう区切る。
   C.wall(3.35, 1.82, mats.kitchenWall, x1 - 0.025, 1.03, z0 - 1.82, -Math.PI / 2);
-  C.pb(1.55, 0.82, 0.5, mats.kitchenSteel, x1 - 0.96, 0.41, z0 - 1.08);
+  cabinet(C,1.55,.79,.5,x1-.96,z0-1.08).rotation.y=Math.PI;
+  C.pb(1.58,.045,.53,mats.kitchenSteel,x1-.96,.817,z0-1.08);
+  const faucet=new THREE.Mesh(new THREE.TorusGeometry(.075,.013,8,20,Math.PI),mats.kitchenSteel);
+  faucet.position.set(x1-.98,1.0,z0-1.25);C.g.add(faucet);
+  C.pb(.026,.15,.026,mats.kitchenSteel,x1-1.055,.925,z0-1.25);
   C.blk(x1 - 1.78, z0 - 1.37, x1 - 0.1, z0 - 0.79);
-  const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.035, 16), mats.darksteel);
-  sink.scale.z = 1.35; sink.position.set(x1 - 0.98, 0.84, z0 - 1.08); C.g.add(sink);
+  const sink = new THREE.Mesh(new THREE.LatheGeometry([[0,0],[.11,0],[.16,.015],[.195,.052],[.21,.056],[.215,.048]].map(([r,y])=>new THREE.Vector2(r,y)),40),mats.kitchenSteel);
+  sink.scale.x=1.35;sink.position.set(x1-.98,.842,z0-1.08);C.g.add(sink);
   // 吊り戸棚は部屋別に置くとトイレへ重なるため、共通の流しの真上だけに固定する。
-  const upper = C.pb(1.45, 0.55, 0.3, mats.wood, x1 - 0.96, 1.73, z0 - 0.91);
+  const upper = cabinet(C,1.45,.55,.3,x1-.96,z0-.91,1.455);
   upper.userData.kind = "kitchenUpper";
+  upper.rotation.y=Math.PI;
   buildFridge(C, x1 - [0.52, 0.9, 0.55][C.layout], z0 - [2.75, 3.0, 3.35][C.layout]);
 }
 
@@ -647,8 +662,16 @@ function furnishHome(C) {
     if(kind==='bed') {
       part(w,.2,d,m.darkwood,0,.25,0); part(w-.08,.18,d-.1,m.cushion,0,.44,0);
       part(w,.85,.08,m.wood,0,.48,-d/2+.04);
-      part(w-.22,.12,.38,m.letterPaper,0,.57,-d/2+.35);
-      part(w-.06,.05,d*.6,m.shade,0,.56,d*.15);
+      const pillow = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12), m.pillow);
+      pillow.scale.set((w-.24)/2,.085,.21);put(g,pillow,0,.59,-d/2+.35);
+      for (const xx of [-w/2+.05,w/2-.05]) part(.07,.16,d,m.wood,xx,.36,0);
+      for (const xx of [-w/2+.07,w/2-.07]) part(.10,1,.10,m.darkwood,xx,.5,-d/2+.04);
+      part(w-.14,.07,.035,m.darkwood,0,.83,-d/2+.09);
+      const quilt = new THREE.Mesh(new THREE.BoxGeometry(w-.06,.075,d*.60,18,2,20),m.futon2);
+      const qp=quilt.geometry.attributes.position;
+      for(let i=0;i<qp.count;i++) {const x=qp.getX(i),z=qp.getZ(i);qp.setY(i,qp.getY(i)+.018*Math.sin(z*30+x*8)+.012*Math.cos(x*24));}
+      quilt.geometry.computeVertexNormals();put(g,quilt,0,.57,d*.15);
+      part(w-.06,.055,.16,m.futon2,0,.61,-d*.11);
       for(const xx of [-w/2+.08,w/2-.08])for(const zz of [-d/2+.1,d/2-.1])part(.09,.3,.09,m.darkwood,xx,.15,zz);
     } else if(kind==='dresser') {
       C.g.remove(g);buildDresser(C,w,1.30,d,x,z);
@@ -656,6 +679,8 @@ function furnishHome(C) {
       const h=kind==='desk'?.74:.48;
       part(w,.065,d,m.wood,0,h,0);
       for(const xx of [-w/2+.06,w/2-.06])for(const zz of [-d/2+.06,d/2-.06])part(.065,h,.065,m.darkwood,xx,h/2,zz);
+      for(const zz of [-d/2+.055,d/2-.055])part(w-.10,.11,.045,m.wood,0,h-.075,zz);
+      for(const xx of [-w/2+.055,w/2-.055])part(.045,.11,d-.10,m.wood,xx,h-.075,0);
       if(kind==='desk'){part(w*.36,.18,d-.04,m.darkwood,w*.27,h-.12,0);part(.15,.025,.035,m.steel,w*.27,h-.12,d/2);}
     }
     C.blk(x-w/2,z-d/2,x+w/2,z+d/2);
@@ -672,8 +697,53 @@ function buildDresser(C,w,h,d,x,z) {
     const faceMat=new THREE.MeshStandardMaterial({map,roughness:.65,color:0xf0e6d8});
     const drawer=box(w-.06,(h-.12)/4-.012,.045,[side,side,side,side,faceMat,side]);
     drawer.position.set(0,.07+(i+.5)*(h-.12)/4,d/2+.014);g.add(drawer);
+    for(const xx of [-w*.23,w*.23]) {
+      for(const off of [-.055,.055])put(g,box(.022,.035,.035,C.mats.darksteel),xx+off,drawer.position.y,d/2+.052);
+      put(g,box(.14,.021,.025,C.mats.steel),xx,drawer.position.y-.013,d/2+.074);
+    }
   }
+  put(g,box(w+.02,.07,d+.02,side),0,.045,0);
+  for(const xx of [-w/2+.022,w/2-.022])put(g,box(.044,h-.07,.045,side),xx,h/2,d/2+.016);
   return g;
+}
+
+// Recessed door panels and raised hardware make small storage cabinets legible in silhouette.
+function cabinet(C,w,h,d,x,z,y=0) {
+  const g=new THREE.Group();g.position.set(x,y,z);g.userData.furniture='cabinet';C.g.add(g);
+  const m=C.mats;
+  put(g,box(w,h,d,m.darkwood),0,h/2,0);
+  put(g,box(w+.035,.035,d+.025,m.wood),0,h,0);
+  for(const sign of [-1,1]) {
+    const cx=sign*w/4;
+    put(g,box(w/2-.018,h-.07,.025,m.wood),cx,h/2,d/2+.005);
+    put(g,box(w/2-.09,h-.17,.013,m.darkwood),cx,h/2,d/2+.022);
+    put(g,box(.018,.12,.032,m.steel),sign*.055,h*.6,d/2+.046);
+  }
+  put(g,box(w-.06,.055,.025,m.darkwood),0,.027,d/2+.028);
+  return g;
+}
+
+// A filled plastic sack: flattened base, uneven shoulders, gathered neck and tied tails.
+function garbageBag(C,r,x,z,seed,y=.035) {
+  const g=new THREE.Group();g.name='garbage-bag';g.position.set(x,y,z);C.g.add(g);
+  const profile=[[0,0],[.68,.015],[.93,.14],[1,.43],[.89,.78],[.65,1.02],[.24,1.24],[.10,1.32]];
+  const rings=[];
+  for(let j=0;j<profile.length-1;j++)for(let k=0;k<3;k++){const t=k/3; rings.push(new THREE.Vector2((profile[j][0]*(1-t)+profile[j+1][0]*t)*r,(profile[j][1]*(1-t)+profile[j+1][1]*t)*r));}
+  rings.push(new THREE.Vector2(.10*r,1.32*r));
+  const geo=new THREE.LatheGeometry(rings,48);
+  const pos=geo.attributes.position;
+  for(let i=0;i<pos.count;i++) {
+    const xx=pos.getX(i),zz=pos.getZ(i),yy=pos.getY(i),a=Math.atan2(xx,zz),v=yy/r;
+    const fold=1+.018*Math.sin(a*23+v*13+seed)+.025*Math.sin(a*11-v*7)+.045*Math.cos(a*3+seed);
+    pos.setXYZ(i,xx*fold+Math.sin(seed)*r*.10*v*v,yy,zz*fold*.88);
+  }
+  geo.computeVertexNormals();g.add(new THREE.Mesh(geo,C.mats.bag));
+  const knot=new THREE.Mesh(new THREE.TorusGeometry(r*.105,r*.043,8,16),C.mats.bag);knot.rotation.x=Math.PI/2;put(g,knot,0,r*1.30,0);
+  for(const side of [-1,1]) {
+    const tail=new THREE.Mesh(new THREE.ConeGeometry(r*.14,r*.32,7,2),C.mats.bag);
+    tail.rotation.z=side*.7;tail.rotation.x=.3;tail.scale.z=.22;put(g,tail,side*r*.09,r*1.45,0);
+  }
+  g.rotation.y=seed;return g;
 }
 
 function buildMemoProp(C, id, px, pz) {
@@ -699,7 +769,7 @@ const FURNISH = {
   kitchen(C) {
     const { mats, dx, x0, x1, z0, z1, zMid, H } = C;
     // 靴箱
-    C.pb(0.9, 0.75, 0.35, mats.wood, x1 - 0.6, 0.38, z0 - 1.95);
+    cabinet(C,.9,.75,.35,x1-.6,z0-1.95).rotation.y=Math.PI;
     C.blk(x1 - 1.1, z0 - 2.15, x1 - 0.1, z0 - 1.75);
     // 靴箱の上。ここに懐中電灯や鍵を置きます
     C.itemAt = [x1 - 0.6, z0 - 1.93];
@@ -830,7 +900,14 @@ const FURNISH = {
     // ランドセル
     C.pb(0.3, 0.36, 0.22, mats.satchel, x0 + 1.7, 0.18, z1 + 0.9);
     // 本棚
-    C.pb(0.8, 1.5, 0.3, mats.wood, x1 - 0.5, 0.75, z1 + 0.3);
+    const shelf=new THREE.Group();shelf.userData.furniture='bookshelf';shelf.position.set(x1-.5,0,z1+.3);C.g.add(shelf);
+    put(shelf,box(.8,1.5,.035,mats.darkwood),0,.75,-.13);
+    for(const x of [-.38,.38])put(shelf,box(.04,1.5,.3,mats.wood),x,.75,0);
+    for(const y of [.035,.4,.77,1.14,1.48])put(shelf,box(.8,.035,.3,mats.wood),0,y,0);
+    for(let row=0;row<3;row++)for(let i=0;i<8;i++) {
+      const h=.21+((i*3+row)%5)*.019;
+      put(shelf,box(.052,h,.18,[mats.notebook,mats.darkwood,mats.envelope][(i+row)%3]),-.30+i*.079,.4+row*.37+.018+h/2,.025);
+    }
     C.blk(x1 - 0.9, z1, x1 - 0.1, z1 + 0.5);
     // 柱の傷
     for (let i = 0; i < 12; i++) {
@@ -870,17 +947,12 @@ const FURNISH = {
       const px = x0 + 0.5 + Math.random() * (D.UNIT_W - 1.0);
       const pz = z1 + 0.4 + Math.random() * 2.4;
       const r = 0.24 + Math.random() * 0.16;
-      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), mats.bag);
-      m.scale.set(1, 0.78, 1);
-      m.position.set(px, r * 0.7, pz);
-      C.g.add(m);
+      garbageBag(C,r,px,pz,i*2.399);
       if (i % 3 === 0) C.blk(px - r, pz - r, px + r, pz + r);
     }
-    const top = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6), mats.bag);
-    top.scale.set(1, 0.8, 1);
-    top.position.set(dx, 0.72, z1 + 1.2);
-    C.g.add(top);
-    C.fx.push({ kind: "sink", mesh: top, y0: 0.72 });
+    garbageBag(C,.40,dx,z1+1.2,2.7);
+    const top = garbageBag(C,.30,dx,z1+1.2,.6,.47);
+    C.fx.push({ kind: "sink", mesh: top, y0: .47, x: dx, z: z1+1.2 });
     C.detailAt = [dx, z1 + 1.9];
   },
 
@@ -889,9 +961,18 @@ const FURNISH = {
     const { mats, dx, x0, x1, z1, zMid, H } = C;
     // 洗濯機
     C.pb(0.62, 0.92, 0.62, mats.appliance, x0 + 0.6, 0.46, zMid - 0.6);
+    C.pb(.54,.025,.39,mats.darksteel,x0+.6,.927,zMid-.56);
+    C.pb(.48,.02,.34,mats.porcelain,x0+.6,.947,zMid-.56);
+    C.pb(.53,.055,.09,mats.porcelain,x0+.6,.945,zMid-.84);
+    for(let i=0;i<3;i++)C.pb(.035,.009,.022,mats.darksteel,x0+.47+i*.065,.978,zMid-.84);
+    C.pb(.12,.01,.018,mats.steel,x0+.6,.962,zMid-.39);
     C.blk(x0 + 0.25, zMid - 0.95, x0 + 0.95, zMid - 0.25);
     // 洗面台と鏡
-    C.pb(0.8, 0.8, 0.45, mats.porcelain, x1 - 0.6, 0.4, zMid - 0.6);
+    cabinet(C,.8,.75,.45,x1-.6,zMid-.6);
+    const basin=new THREE.Mesh(new THREE.LatheGeometry([[0,0],[.10,.006],[.17,.045],[.20,.10],[.23,.12],[.245,.10]].map(([r,y])=>new THREE.Vector2(r,y)),32),mats.porcelain);
+    basin.scale.x=1.35;put(C.g,basin,x1-.6,.77,zMid-.6);
+    C.pb(.025,.22,.025,mats.steel,x1-.6,.92,zMid-.78);
+    C.pb(.025,.025,.09,mats.steel,x1-.6,1.02,zMid-.745);
     C.blk(x1 - 1.0, zMid - 0.85, x1 - 0.2, zMid - 0.35);
     const mir = C.wall(0.55, 0.7, mats.mirror, x1 - 0.05, 1.45, zMid - 0.6, -Math.PI / 2);
     addGhost(C, mir, x1 - 0.12, 1.35, zMid - 0.6, -Math.PI / 2, 0.5, 1.0);
@@ -1053,7 +1134,7 @@ const FURNISH = {
     for (let i = 0; i < 4; i++) doll(dx - 0.7 + i * 0.45, 1.35, false);
     C.fx.push({ kind: "turned", dolls: made, x: dx, z: z1 + 0.6 });
     // 学習机
-    C.pb(1.0, 0.7, 0.55, mats.wood, x1 - 0.7, 0.35, zMid - 0.6);
+    writingTable(C,1,.7,.55,x1-.7,zMid-.6);
     C.blk(x1 - 1.25, zMid - 0.9, x1 - 0.15, zMid - 0.3);
     C.detailAt = [dx, z1 + 1.0];
   },
@@ -1062,7 +1143,7 @@ const FURNISH = {
   letter(C) {
     const { mats, dx, x0, x1, z1, zMid } = C;
     // 文机の上に、封を切っていない手紙
-    C.pb(0.95, 0.32, 0.5, mats.darkwood, dx, 0.16, zMid - 1.4);
+    writingTable(C,.95,.32,.5,dx,zMid-1.4);
     C.blk(dx - 0.55, zMid - 1.7, dx + 0.55, zMid - 1.1);
     C.memoAt = [dx, zMid - 1.4];
     C.pb(0.6, 0.09, 0.6, mats.cushion, dx, 0.05, zMid - 2.1);
@@ -1097,13 +1178,23 @@ const FURNISH = {
   },
 };
 
+function writingTable(C,w,h,d,x,z) {
+  C.pb(w,.045,d,C.mats.wood,x,h-.022,z);
+  for(const xx of [-w/2+.05,w/2-.05])for(const zz of [-d/2+.05,d/2-.05])C.pb(.06,h-.045,.06,C.mats.darkwood,x+xx,(h-.045)/2,z+zz);
+  C.pb(w-.12,.11,d-.06,C.mats.darkwood,x,h-.105,z);
+  C.pb(w-.15,.075,.025,C.mats.wood,x,h-.10,z+d/2-.01);
+  C.pb(.12,.016,.025,C.mats.steel,x,h-.10,z+d/2+.014);
+}
+
 function lowTable(C, px, pz) {
   const t = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 16), C.mats.wood);
   t.position.set(px, 0.34, pz);
   C.g.add(t);
-  const l = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.32, 8), C.mats.wood);
-  l.position.set(px, 0.16, pz);
-  C.g.add(l);
+  for(const xx of [-.28,.28])for(const zz of [-.28,.28]) {
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,.30,10),C.mats.darkwood);
+    put(C.g,leg,px+xx,.15,pz+zz);
+  }
+  for(const zz of [-.28,.28])C.pb(.62,.075,.04,C.mats.darkwood,px,.27,pz+zz);
   C.blk(px - 0.52, pz - 0.52, px + 0.52, pz + 0.52);
 }
 
@@ -1321,7 +1412,7 @@ export function buildFloor(scene, floorDef, opt) {
     scribble: lam({ map: TX.scribble(), transparent: true }),
     stain: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false }),
     stainDark: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }),
-    bag: lam({ color: 0x22242a }),
+    bag: new THREE.MeshStandardMaterial({ color: 0x292d31, roughness: .56, metalness: 0 }),
     porcelain: new THREE.MeshStandardMaterial({ map: bathTexture(), color: 0xf1eee6, roughness:.3 }),
     kitchenSteel: lam({ map: interiorTexture(0, 1), color: 0xb2b0aa }),
     mirror: lam({ map: interiorTexture(2, 1), color: 0xa5aaa7 }),
