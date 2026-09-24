@@ -244,6 +244,20 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   const style = (unit.no || 0) % 3; // 部屋ごとの怪異の違いは保つ。
   // 窓の前には覆いを置かず、窓枠と夜景がそのまま見えるようにする。
 
+  // Bridge the 16 cm reveal between the room wall and corridor facade.
+  // Keep the existing clear doorway width and height for movement and the door swing.
+  const revealDepth = D.CORR_Z0 - z0 + .02, revealZ = (z0 + D.CORR_Z0) / 2;
+  const threshold = plane(D.DOOR_W + .04, revealDepth, mats.entryFloor);
+  threshold.rotation.x = -Math.PI / 2;put(g,threshold,dx,.012,revealZ);
+  threshold.name = 'entrance-threshold';
+  for(const side of [-1,1]) {
+    const jamb=box(.04,D.DOOR_H,revealDepth,wallMat);
+    put(g,jamb,dx+side*(D.DOOR_W/2+.02),D.DOOR_H/2,revealZ);
+    jamb.name='entrance-reveal';
+  }
+  const soffit=box(D.DOOR_W,H-D.DOOR_H,revealDepth,wallMat);
+  put(g,soffit,dx,(H+D.DOOR_H)/2,revealZ);soffit.name='entrance-reveal';
+
   /* --- 家財 --- */
   const C = {
     g, col, inter, fx, mats, dx, x0, x1, z0, z1, zMid, H, room, unit, layout,
@@ -452,14 +466,17 @@ function commonWetArea(C) {
   const infill = C.pb(.10, H, back - C.zMid + .08, mats.paper, right, H / 2, (back + C.zMid) / 2);
   infill.name = 'wet-side-infill';
   C.blk(right - .05, C.zMid - .04, right + .05, back + .04);
+  const frontInfill=C.pb(.10,H,z0-front+.08,mats.paper,right,H/2,(front+z0)/2);
+  frontInfill.name='wet-front-infill';
+  C.blk(right-.05,front-.04,right+.05,z0+.04);
 
   // 水まわりを左へ寄せ、玄関から居室まで一直線に歩ける幅を中央に残す。
   const split = z0 - 1.88;
   // 同じ新品タイルを敷き通すと間取りが読めないため、トイレと浴室で汚れ方と目地を変える。
-  C.pb(right - left, 0.06, front - split, mats.wetToiletFloor, (left + right) / 2, 0.035, (front + split) / 2);
-  C.pb(right - left, 0.06, split - back, mats.wetBathFloor, (left + right) / 2, 0.035, (split + back) / 2);
-  C.pb(right - left, H, 0.08, mats.wetWall, (left + right) / 2, H / 2, split);
-  C.blk(left, split - 0.04, right, split + 0.04);
+  C.pb(right - x0, 0.06, front - split, mats.wetToiletFloor, (x0 + right) / 2, 0.035, (front + split) / 2);
+  C.pb(right - x0, 0.06, split - back, mats.wetBathFloor, (x0 + right) / 2, 0.035, (split + back) / 2);
+  C.pb(right - x0, H, 0.08, mats.wetWall, (x0 + right) / 2, H / 2, split);
+  C.blk(x0, split - 0.04, right, split + 0.04);
 
   // 廊下側の壁は戸口だけ切り欠く。戸を開けたときだけ当たり判定も外す。
   const makeFront = (za, zb, name) => {
