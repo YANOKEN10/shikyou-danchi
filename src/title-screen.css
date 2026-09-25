@@ -11,9 +11,9 @@
 .title-tagline{font-size:clamp(12px,2vw,16px);letter-spacing:.16em;margin-top:36px;color:#c3c3bd;line-height:1.9;text-shadow:0 2px 8px #000}
 .title-action{position:absolute;bottom:max(15%,95px);font-size:13px;letter-spacing:.22em;line-height:1.8;padding:12px 22px;border-bottom:1px solid #b6a18770;color:#ded8ca;animation:title-breathe 4s ease-in-out infinite}
 .title-footnote{position:absolute;bottom:max(26px,env(safe-area-inset-bottom));left:18px;right:18px;z-index:2;text-align:center;font:8px/1.8 var(--gothic);letter-spacing:.2em;color:#888e91;pointer-events:none}
-#titleScreen[data-language='en'] .title-wordmark{font-size:clamp(26px,7vw,100px);letter-spacing:.06em;padding-left:.06em}
-#titleScreen[data-language='en'] .title-reading{display:none}
+#titleScreen:is([data-language='en'],[data-language='es']) .title-wordmark{font-size:clamp(26px,7vw,100px);letter-spacing:.06em;padding-left:.06em}
+#titleScreen:is([data-language='en'],[data-language='es']) .title-reading{display:none}
 @keyframes title-drift{from{transform:translateX(-3%)}to{transform:translateX(3%)}}
 @keyframes title-breathe{0%,100%{opacity:.65}50%{opacity:1}}
-@media(max-height:500px){#titleEnter{padding:20px 20px 55px}.title-location{margin-bottom:8px;font-size:10px}.title-wordmark{font-size:clamp(40px,9vh,65px)}.title-reading{margin-top:5px;font-size:8px}.title-tagline{margin-top:12px;font-size:12px}.title-action{bottom:32px;padding:5px 18px;font-size:12px}.title-footnote{bottom:8px;font-size:7px}#titleScreen[data-language='en'] .title-wordmark{font-size:clamp(26px,7vw,62px)}}
+@media(max-height:500px){#titleEnter{padding:20px 20px 55px}.title-location{margin-bottom:8px;font-size:10px}.title-wordmark{font-size:clamp(40px,9vh,65px)}.title-reading{margin-top:5px;font-size:8px}.title-tagline{margin-top:12px;font-size:12px}.title-action{bottom:32px;padding:5px 18px;font-size:12px}.title-footnote{bottom:8px;font-size:7px}#titleScreen:is([data-language='en'],[data-language='es']) .title-wordmark{font-size:clamp(26px,7vw,62px)}}
 @media(prefers-reduced-motion:reduce){#titleScreen{transition:none}.title-mist,.title-action{animation:none}}

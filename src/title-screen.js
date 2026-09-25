@@ -6,6 +6,7 @@ export function showTitleScreen() {
   const button = document.getElementById('titleEnter');
   const copy = {
     ja: ['四号棟', '死鏡団地', '決して、入ってはいけない。', 'タップしてはじめる', 'はじめる'],
+    es: ['BLOQUE CUATRO', 'SHIKYOU DANCHI', 'Nunca debes entrar.', 'Toca para comenzar', 'Comenzar'],
     en: ['BUILDING No. 4', 'SHIKYOU DANCHI', 'Never enter.', 'Tap to begin', 'Begin'],
     'zh-Hans': ['四号楼', '死镜团地', '绝对不要进去。', '轻触开始', '开始'],
     'zh-Hant': ['四號樓', '死鏡團地', '絕對不要進去。', '輕觸開始', '開始'],

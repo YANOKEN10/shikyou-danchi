@@ -1,10 +1,13 @@
+import { trSpanish } from './es-locale.js';
 import { EN } from './en.js';
 
 const KEY = 'shikyou:language';
 function preferredLanguage() {
-  const requested = new URLSearchParams(location.search).get('lang');
+  const requested = new URLSearchParams(location.search).get('lang')?.toLowerCase();
+  if (requested === 'es' || requested?.startsWith('es-')) return 'es';
   if (requested === 'en' || requested === 'ja') return requested;
-  try { const saved = localStorage.getItem(KEY); if (saved === 'en' || saved === 'ja') return saved; } catch {}
+  try { const saved = localStorage.getItem(KEY); if (saved === 'es' || saved === 'en' || saved === 'ja') return saved; } catch {}
+  if (navigator.language?.toLowerCase().startsWith('es')) return 'es';
   return navigator.language?.toLowerCase().startsWith('ja') ? 'ja' : 'en';
 }
 export const language = preferredLanguage();
@@ -15,6 +18,7 @@ const floors = { '一階': '1F', '二階': '2F', '三階': '3F', '四階': '4F',
 
 // Only display strings enter this function. Save IDs, account names and game state stay untouched.
 export function tr(value) {
+  if (language === 'es') return trSpanish(value, missingTranslations);
   if (language !== 'en' || typeof value !== 'string') return value;
   if (Object.hasOwn(EN, value)) return EN[value];
   const text = value.trim();
@@ -75,7 +79,7 @@ export function addLanguagePicker(host) {
   label.append('Language / 言語 ');
   const select = document.createElement('select');
   select.setAttribute('aria-label', 'Language / 言語');
-  select.innerHTML = '<option value="ja">日本語</option><option value="en">English</option>';
+  select.innerHTML = '<option value="ja">日本語</option><option value="en">English</option><option value="es">Español</option>';
   select.value = language;
   select.onchange = () => {
     try {
@@ -92,8 +96,8 @@ export function addLanguagePicker(host) {
 export function initLocale() {
   document.documentElement.lang = language;
   addLanguagePicker(document.querySelector('#gate .panel'));
-  if (language !== 'en') return;
-  document.title = 'Shikyou Danchi | Horror Game';
+  if (language === 'ja') return;
+  document.title = language === 'es' ? 'Shikyou Danchi | Juego de terror' : 'Shikyou Danchi | Horror Game';
   translateTree(document.body);
   // Covers dynamically created menus and server messages without changing gameplay strings.
   new MutationObserver(records => {

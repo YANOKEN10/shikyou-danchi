@@ -1,22 +1,25 @@
 .language-picker { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin:0 0 14px; color:var(--ink); font:12px var(--gothic); }
 .language-picker select { width:auto; min-width:105px; min-height:44px; padding:6px 12px; border:1px solid var(--accent); border-radius:3px; background:var(--panel); color:var(--ink); font:14px var(--gothic); }
-html:lang(en) { --mincho:Georgia,'Times New Roman',serif; --gothic:system-ui,-apple-system,'Segoe UI',sans-serif; }
-html:lang(en) .panel, html:lang(en) .welcome { overflow-wrap:break-word; word-break:normal; }
-html:lang(en) #gTitle { font-size:clamp(28px,7vw,42px); letter-spacing:.04em; }
-html:lang(en) #gSub { letter-spacing:.03em; line-height:1.5; }
-html:lang(en) .welcome-phrase { display:inline; }
-html:lang(en) .welcome h2 { letter-spacing:.01em; }
-html:lang(en) #welcome-progress { white-space:normal; }
-html:lang(en) .tbtn, html:lang(en) #bAct, html:lang(en) #bBook, html:lang(en) #bPause { font:11px var(--gothic); letter-spacing:0; }
-html:lang(en) #bAct { font-size:15px; }
-html:lang(en) #sub { font-size:clamp(14px,2.1vw,20px); line-height:1.65; letter-spacing:.02em; max-width:min(90vw,800px); }
-html:lang(en) #objective { max-width:calc(100vw - 32px); font-size:13px; letter-spacing:.02em; }
-html:lang(en) .panel h2, html:lang(en) .panel h3 { letter-spacing:.03em; }
-html:lang(en) #readerBody p, html:lang(en) .endlines p { line-height:1.85; letter-spacing:.01em; }
-html:lang(en) .helprow { grid-template-columns:minmax(80px,1fr) minmax(0,2fr); }
-html:lang(en) .tabs .tab { padding-inline:8px; font-size:13px; }
+html:is(:lang(en),:lang(es)) { --mincho:Georgia,'Times New Roman',serif; --gothic:system-ui,-apple-system,'Segoe UI',sans-serif; }
+html:is(:lang(en),:lang(es)) .panel, html:is(:lang(en),:lang(es)) .welcome { overflow-wrap:break-word; word-break:normal; }
+html:is(:lang(en),:lang(es)) #gTitle { font-size:clamp(28px,7vw,42px); letter-spacing:.04em; }
+html:is(:lang(en),:lang(es)) #gSub { letter-spacing:.03em; line-height:1.5; }
+html:is(:lang(en),:lang(es)) .welcome-phrase { display:inline; }
+html:is(:lang(en),:lang(es)) .welcome h2 { letter-spacing:.01em; }
+html:is(:lang(en),:lang(es)) #welcome-progress { white-space:normal; }
+html:is(:lang(en),:lang(es)) .tbtn, html:is(:lang(en),:lang(es)) #bAct, html:is(:lang(en),:lang(es)) #bBook, html:is(:lang(en),:lang(es)) #bPause { font:11px var(--gothic); letter-spacing:0; }
+html:is(:lang(en),:lang(es)) #bAct { font-size:15px; }
+html:is(:lang(en),:lang(es)) #sub { font-size:clamp(14px,2.1vw,20px); line-height:1.65; letter-spacing:.02em; max-width:min(90vw,800px); }
+html:is(:lang(en),:lang(es)) #objective { max-width:calc(100vw - 32px); font-size:13px; letter-spacing:.02em; }
+html:is(:lang(en),:lang(es)) .panel h2, html:is(:lang(en),:lang(es)) .panel h3 { letter-spacing:.03em; }
+html:is(:lang(en),:lang(es)) #readerBody p, html:is(:lang(en),:lang(es)) .endlines p { line-height:1.85; letter-spacing:.01em; }
+html:is(:lang(en),:lang(es)) .helprow { grid-template-columns:minmax(80px,1fr) minmax(0,2fr); }
+html:is(:lang(en),:lang(es)) .tabs .tab { padding-inline:8px; font-size:13px; }
 .welcome .language-picker select { width:auto; min-width:112px; margin:0; }
 .welcome header > button { width:auto; flex:0 0 auto; }
 .welcome header > .welcome-close { width:44px; }
-html:lang(en) #welcome-progress { white-space:nowrap; font-size:11px; }
+html:is(:lang(en),:lang(es)) #welcome-progress { white-space:nowrap; font-size:11px; }
 @media(max-width:360px) { .welcome header { gap:2px; } .welcome #welcome-skip { font-size:12px; padding-inline:4px; } }
+
+html:lang(es) #welcome-progress { white-space:normal; }
+html:lang(es) #gSub { text-wrap:balance; }

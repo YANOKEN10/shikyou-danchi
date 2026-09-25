@@ -36,8 +36,8 @@ export class UI {
   say(text, sec) {
     if (!text) return;
     text = tr(text);
-    const readingTime = language === "en" ? Math.max(2.8, Math.min(14, text.split(/\s+/).length / 3.2)) : Math.max(2.2, text.length * 0.11);
-    this.subQueue.push({ text, sec: language === "en" ? Math.max(sec || 0, readingTime) : (sec || readingTime) });
+    const readingTime = ["en", "es"].includes(language) ? Math.max(2.8, Math.min(14, text.split(/\s+/).length / 3.2)) : Math.max(2.2, text.length * 0.11);
+    this.subQueue.push({ text, sec: ["en", "es"].includes(language) ? Math.max(sec || 0, readingTime) : (sec || readingTime) });
     if (!this.subTimer && !this._gap) this._nextSub();
   }
 
@@ -287,7 +287,7 @@ export class UI {
       if (!line) p.className = "gap";
       wrap.appendChild(p);
       p.classList.add("in");
-      const readingDelay = language === "en" ? Math.max(900, tr(line).split(/\s+/).length * 220) : Math.max(600, line.length * 55);
+      const readingDelay = ["en", "es"].includes(language) ? Math.max(900, tr(line).split(/\s+/).length * 220) : Math.max(600, line.length * 55);
       await new Promise((r) => setTimeout(r, line ? readingDelay : 320));
     }
 
