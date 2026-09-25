@@ -50,6 +50,7 @@
 }
 </script>
 <link rel="stylesheet" href="src/i18n.css">
+<link rel="stylesheet" href="src/title-screen.css">
 <link rel="manifest" href="manifest.webmanifest">
 <!-- アイコンの版をURLに含め、ホーム画面追加時に端末の古いキャッシュを使わせない。 -->
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=2">
@@ -633,7 +634,19 @@
 </div>
 
 <!-- ログイン -->
-<div class="sheet show" id="gate">
+<section id="titleScreen" aria-label="死鏡団地 スタート画面" data-no-translate>
+  <div class="title-scene" aria-hidden="true"></div>
+  <div class="title-mist" aria-hidden="true"></div>
+  <button id="titleEnter" type="button" aria-label="はじめる">
+    <span class="title-location">四号棟</span>
+    <span class="title-wordmark">死鏡団地</span>
+    <span class="title-reading">SHIKYOU DANCHI</span>
+    <span class="title-tagline">その鏡を、覗いてはいけない。</span>
+    <span class="title-action">タップしてはじめる</span>
+  </button>
+  <span class="title-footnote" aria-hidden="true">YANOKEN GAMES · PSYCHOLOGICAL HORROR</span>
+</section>
+<div class="sheet" id="gate">
   <div class="panel">
     <h2 id="gTitle">死鏡団地</h2>
     <p id="gSub">四号棟・解体前夜</p>

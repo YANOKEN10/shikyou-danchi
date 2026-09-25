@@ -1,3 +1,4 @@
+import { showTitleScreen } from './title-screen.js';
 import { initLocale, tr } from "./i18n.js";
 import { showOnboarding } from "./onboarding.js";
 // ============================================================
@@ -405,6 +406,7 @@ $("codeIn").addEventListener("input", () => {
 /* ---------------- 起動 ---------------- */
 
 (async function boot() {
+  await showTitleScreen();
   showFields();
   gate.classList.add("show");
   $("gTitle").textContent = TITLE;

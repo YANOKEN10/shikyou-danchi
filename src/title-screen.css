@@ -1,0 +1,19 @@
+#titleScreen{position:fixed;inset:0;z-index:100;background:#080c10;isolation:isolate;overflow:hidden;opacity:1;transition:opacity .45s ease}
+#titleScreen.leaving{opacity:0;pointer-events:none}
+.title-scene{position:absolute;inset:0;background:url('../assets/generated/ending-exterior-dawn-v1.png') 64% center/cover no-repeat;filter:brightness(.48) saturate(.35);transform:scale(1.025)}
+#titleScreen::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 15%,#02050866 65%,#020305dd 100%),linear-gradient(0deg,#030507e6,transparent 35%,#07101833);z-index:1}
+.title-mist{position:absolute;inset:-15%;background:radial-gradient(ellipse at 30% 65%,#8ea4b01a,transparent 55%),linear-gradient(165deg,transparent 30%,#bbc4bf0c 48%,transparent 65%);animation:title-drift 22s ease-in-out infinite alternate;pointer-events:none}
+#titleEnter{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;background:transparent;color:#e8e4da;z-index:2;cursor:pointer;font-family:var(--mincho);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px 100px;text-align:center;-webkit-appearance:none;box-shadow:none}
+#titleEnter:focus-visible{outline:1px solid #c4b9a0;outline-offset:-12px}
+.title-location{font-size:12px;letter-spacing:.55em;color:#b8b6ad;margin-bottom:28px;padding-left:.55em}
+.title-wordmark{font-size:clamp(48px,10vw,132px);font-weight:700;letter-spacing:.13em;padding-left:.13em;line-height:1.3;white-space:nowrap;text-shadow:2px 1px 0 #541f25aa,0 4px 24px #000,0 0 60px #000}
+.title-reading{font-family:var(--gothic);font-size:10px;letter-spacing:.48em;padding-left:.48em;margin-top:14px;color:#a8a9a5}
+.title-tagline{font-size:clamp(12px,2vw,16px);letter-spacing:.16em;margin-top:36px;color:#c3c3bd;line-height:1.9;text-shadow:0 2px 8px #000}
+.title-action{position:absolute;bottom:max(15%,95px);font-size:13px;letter-spacing:.22em;line-height:1.8;padding:12px 22px;border-bottom:1px solid #b6a18770;color:#ded8ca;animation:title-breathe 4s ease-in-out infinite}
+.title-footnote{position:absolute;bottom:max(26px,env(safe-area-inset-bottom));left:18px;right:18px;z-index:2;text-align:center;font:8px/1.8 var(--gothic);letter-spacing:.2em;color:#888e91;pointer-events:none}
+#titleScreen[data-language='en'] .title-wordmark{font-size:clamp(26px,7vw,100px);letter-spacing:.06em;padding-left:.06em}
+#titleScreen[data-language='en'] .title-reading{display:none}
+@keyframes title-drift{from{transform:translateX(-3%)}to{transform:translateX(3%)}}
+@keyframes title-breathe{0%,100%{opacity:.65}50%{opacity:1}}
+@media(max-height:500px){#titleEnter{padding:20px 20px 55px}.title-location{margin-bottom:8px;font-size:10px}.title-wordmark{font-size:clamp(40px,9vh,65px)}.title-reading{margin-top:5px;font-size:8px}.title-tagline{margin-top:12px;font-size:12px}.title-action{bottom:32px;padding:5px 18px;font-size:12px}.title-footnote{bottom:8px;font-size:7px}#titleScreen[data-language='en'] .title-wordmark{font-size:clamp(26px,7vw,62px)}}
+@media(prefers-reduced-motion:reduce){#titleScreen{transition:none}.title-mist,.title-action{animation:none}}
