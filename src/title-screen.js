@@ -5,10 +5,10 @@ export function showTitleScreen() {
   if (!screen) return Promise.resolve();
   const button = document.getElementById('titleEnter');
   const copy = {
-    ja: ['四号棟', '死鏡団地', 'その鏡を、覗いてはいけない。', 'タップしてはじめる', 'はじめる'],
-    en: ['BUILDING No. 4', 'SHIKYOU DANCHI', 'Do not look into the mirror.', 'Tap to begin', 'Begin'],
-    'zh-Hans': ['四号楼', '死镜团地', '不要窥视那面镜子。', '轻触开始', '开始'],
-    'zh-Hant': ['四號樓', '死鏡團地', '不要窺視那面鏡子。', '輕觸開始', '開始'],
+    ja: ['四号棟', '死鏡団地', '決して、入ってはいけない。', 'タップしてはじめる', 'はじめる'],
+    en: ['BUILDING No. 4', 'SHIKYOU DANCHI', 'Never enter.', 'Tap to begin', 'Begin'],
+    'zh-Hans': ['四号楼', '死镜团地', '绝对不要进去。', '轻触开始', '开始'],
+    'zh-Hant': ['四號樓', '死鏡團地', '絕對不要進去。', '輕觸開始', '開始'],
   }[language] || null;
   if (copy) {
     ['.title-location', '.title-wordmark', '.title-tagline', '.title-action'].forEach((selector, i) => {
