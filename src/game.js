@@ -1,3 +1,4 @@
+import { MirrorFigures } from './mirror-figures.js';
 // ============================================================
 //  ゲーム本体
 //   ・階を1つずつ組み立て／片づけしながら進みます（軽くするため）
@@ -650,7 +651,7 @@ export class Game {
       // The visual reveal has no sting.
       this.ui.hit();
     } else if (s === "mirror") {
-      const f = this.floor.fx.find((k) => k.kind === "mirror");
+      const f = this.floor.fx.filter(k => k.kind === "mirror").sort((a,b) => Math.hypot(a.x-it.x,a.z-it.z)-Math.hypot(b.x-it.x,b.z-it.z))[0];
       if (f) { f.ph = 0.0001; f.t = 14 + Math.random() * 14; this.snd.suddenTerror(); }
       this.snd.whisper();
     } else if (s === "static") {
@@ -676,6 +677,9 @@ export class Game {
       const facing = dist < 0.01 ? 1 : (dx / dist) * fwd.x + (dz / dist) * fwd.z;
 
       if (f.kind === "mirror") {
+        if (!this.mirrorFigures) this.mirrorFigures = new MirrorFigures(this.renderer, B.buildEntity());
+        if (this._mirrorFrame == null || this.state.seconds - this._mirrorFrame > .12) { this.mirrorFigures.render(this.state.seconds); this._mirrorFrame = this.state.seconds; }
+        this.mirrorFigures.apply(f, this.player);
         // 見ているあいだに、うしろへ何かが立つ
         if (f.ph != null && f.ph > 0) {
           f.ph += dt / 1.6;

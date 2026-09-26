@@ -65,11 +65,9 @@ const generatedTatami = generatedTexture("./assets/generated/tatami-aged.webp", 
 const interiorAtlas = generatedTexture("./assets/generated/interior-decay-atlas-v2.png?v=20260830");
 const wetAreaAtlas = generatedTexture("./assets/generated/wet-area-decay-atlas-v1.png?v=20260831");
 // 四分割素材では鏡の中で顔が小さく潰れたため、鏡だけは縦長の専用画像を原寸で使う。
-const generatedMirrorGhost = generatedTexture("./assets/generated/mirror-ghost-v2.png?v=20260901");
 const roomSurfacesAtlas = generatedTexture("./assets/generated/room-surfaces-atlas-v1.png?v=20260901");
 const butsudanAtlas = generatedTexture("./assets/generated/butsudan-atlas-v1.png?v=20260901");
 const generatedWindow = generatedTexture("./assets/generated/window-night-v1.png?v=20260905");
-const livedInAtlas = generatedTexture("./assets/generated/lived-in-clutter-atlas-v1.png?v=20260905");
 const fridgeInterior = generatedTexture("./assets/generated/fridge-interior-v1.png?v=20260905");
 const fridgeDoorInside = generatedTexture("./assets/generated/fridge-door-inside-v1.png?v=20260905");
 
@@ -84,14 +82,7 @@ function interiorTexture(col, row) {
 }
 
 // 生成した生活用品を六区画から切り出し、各住戸で違う組み合わせを置けるようにする。
-function livedInTexture(index) {
-  const tex = livedInAtlas.clone();
-  tex.needsUpdate = true;
-  tex.repeat.set(1 / 3, 1 / 2);
-  const col = index % 3, row = Math.floor(index / 3);
-  tex.offset.set(col / 3, row === 0 ? 1 / 2 : 0);
-  return tex;
-}
+
 
 // 水回り専用の四区画素材。共通画像から切り出して床・戸・照明の年代感を揃える。
 function wetAreaTexture(col, row) {
@@ -284,7 +275,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   commonRoom(C);
   styleWalls(C);
   commonWetArea(C);
-  commonClutter(C);
+  // Repeated atlas props removed: they read as distorted spirals.
   (FURNISH[room.kind] || FURNISH.kitchen)(C);
 
   /* --- 部屋の中のもの（拾う・読む） --- */
@@ -379,65 +370,6 @@ function commonRoom(C) {
 
   // コンセントと、壁のしみ
   C.pb(0.09, 0.13, 0.015, mats.plate, x1 - 0.02, 0.32, z1 + 1.6, -Math.PI / 2);
-}
-
-function commonClutter(C) {
-  const { mats, unit, x0, x1, z1, zMid } = C;
-  const seed = Math.abs(Number(unit.no) || 0) % 6;
-  const specs = [
-    // 壁ぎわに寄せることで生活感を増やしても、玄関から奥への歩線は塞がない。
-    [x0 + 0.42, zMid - 0.72, 0.18],
-    [x1 - 0.42, zMid - 1.72, -0.32],
-    [x0 + 0.42, z1 + 1.05, 0.42],
-  ];
-  specs.forEach(([x, z, ry], i) => {
-    const kind = (seed + i * 2) % 6;
-    const g = buildClutterModel(mats.clutter[kind], kind);
-    g.position.set(x, 0.02, z);
-    g.rotation.y = ry;
-    C.g.add(g);
-  });
-}
-
-// 生成画像は立体模型の表面材として使い、横から見ても厚みと輪郭が残るよう部品を組み立てる。
-function buildClutterModel(mat, kind) {
-  const g = new THREE.Group();
-  const add = (m, x, y, z) => { m.position.set(x, y, z); g.add(m); return m; };
-  if (kind === 0) {
-    add(box(0.62, 0.08, 0.44, mat), 0, 0.04, 0);
-    add(box(0.06, 0.38, 0.44, mat), -0.28, 0.23, 0);
-    add(box(0.06, 0.38, 0.44, mat), 0.28, 0.23, 0);
-    for (let i = 0; i < 5; i++) {
-      const cloth = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 7), mat);
-      cloth.scale.set(1.25, 0.62, 0.9); add(cloth, -0.2 + (i % 3) * 0.2, 0.38 + (i % 2) * 0.08, (i % 2) * 0.1 - 0.05);
-    }
-  } else if (kind === 1) {
-    for (let i = 0; i < 7; i++) add(box(0.62 - i * 0.018, 0.035, 0.43, mat), (i % 2) * 0.02, 0.018 + i * 0.035, 0, (i % 2) * 0.04);
-  } else if (kind === 2) {
-    for (const sx of [-1, 1]) {
-      const bag = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 0.52, 10), mat);
-      add(bag, sx * 0.22, 0.26, 0);
-      const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.52, 10), mat);
-      add(bottle, sx * 0.22, 0.56, 0);
-    }
-  } else if (kind === 3) {
-    const kettle = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 10), mat);
-    kettle.scale.y = 0.72; add(kettle, -0.14, 0.22, 0);
-    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.025, 7, 16, Math.PI), mat);
-    handle.rotation.z = Math.PI; add(handle, -0.14, 0.42, 0);
-    for (const sx of [0.15, 0.34]) add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.18, 12), mat), sx, 0.09, 0.12);
-  } else if (kind === 4) {
-    add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.25, 0.45, 16), mat), -0.08, 0.225, 0);
-    for (let i = 0; i < 3; i++) add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.42 + i * 0.05, 10), mat), 0.24 + i * 0.1, 0.21 + i * 0.025, 0.04);
-  } else {
-    add(box(0.58, 0.38, 0.2, mat), 0, 0.2, 0);
-    for (const sx of [-0.2, 0.2]) {
-      const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.035, 10), mat);
-      knob.rotation.x = Math.PI / 2; add(knob, sx, 0.2, 0.12);
-    }
-    add(box(0.22, 0.27, 0.06, mat), 0.38, 0.145, 0.04);
-  }
-  return g;
 }
 
 /* ---------- どの部屋にもある水まわり ---------- */
@@ -1214,13 +1146,20 @@ function lowTable(C, px, pz) { styledTable(C, px, pz); }
 
 // 鏡にうつるもの（ふだんは見えない）
 function addGhost(C, mirror, px, py, pz, ry, w, h) {
-  const m = plane(w, h, C.mats.ghost.clone());
-  m.material.opacity = 0;
-  m.material.transparent = true;
-  m.position.set(px, py, pz);
-  m.rotation.y = ry || 0;
-  C.g.add(m);
-  C.fx.push({ kind: "mirror", mesh: m, mirror, x: px, z: pz, t: 4 + Math.random() * 8 });
+  const tall = mirror.geometry.parameters.height > 1.2;
+  const height = tall ? mirror.geometry.parameters.height * .91 : mirror.geometry.parameters.height * .94;
+  const width = tall ? height * (1.4 / 2.2) : height * 1.4;
+  // Full-length figures fit inside a standing mirror; small mirrors crop the torso.
+  const geometry = new THREE.PlaneGeometry(Math.min(width, mirror.geometry.parameters.width * .96), height);
+  const uv=geometry.attributes.uv, cropY=tall?1:.45, cropX=(geometry.parameters.width/height)/(1.4/2.2)*cropY;
+  for(let i=0;i<uv.count;i++){uv.setX(i,.5+(uv.getX(i)-.5)*cropX);if(!tall)uv.setY(i,.55+uv.getY(i)*cropY);}
+  const mat = new THREE.MeshBasicMaterial({ transparent:true, opacity:0, depthWrite:false, toneMapped:false });
+  const m = new THREE.Mesh(geometry,mat);
+  m.position.copy(mirror.position); m.position.x+=Math.sin(ry)*.012; m.position.z+=Math.cos(ry)*.012;
+  m.rotation.y=ry||0; C.g.add(m);
+  const reflection = new THREE.Mesh(geometry.clone(),mat.clone()); reflection.material.opacity=.82;
+  reflection.position.copy(m.position); reflection.rotation.copy(m.rotation); C.g.add(reflection);
+  C.fx.push({kind:'mirror',mesh:m,reflection,mirror,x:px,z:pz,t:6+Math.random()*8});
 }
 
 /* ---------- 階段室 ---------- */
@@ -1429,7 +1368,7 @@ export function buildFloor(scene, floorDef, opt) {
     bag: new THREE.MeshStandardMaterial({ color: 0x292d31, roughness: .56, metalness: 0 }),
     porcelain: new THREE.MeshStandardMaterial({ map: bathTexture(), color: 0xf1eee6, roughness:.3 }),
     kitchenSteel: lam({ map: interiorTexture(0, 1), color: 0xb2b0aa }),
-    mirror: lam({ map: interiorTexture(2, 1), color: 0xa5aaa7 }),
+    mirror: new THREE.MeshBasicMaterial({ map: TX.mirrorGlass(), color: 0xa5b6bd }),
     mirrorSmear: new THREE.MeshBasicMaterial({ map: TX.mirrorSmear(), transparent: true, depthWrite: false }),
     shade: lam({ color: 0xcdc6b2 }),
     cord: lam({ color: 0xb8b2a2 }),
@@ -1438,7 +1377,6 @@ export function buildFloor(scene, floorDef, opt) {
     frame: lam({ color: 0x5a4530 }),
     generatedWindow: new THREE.MeshBasicMaterial({ map: generatedWindow }),
     // 写実素材を標準材質へ貼り、照明と視点に応じて明暗が変わる立体物として見せる。
-    clutter: Array.from({ length: 6 }, (_, i) => new THREE.MeshStandardMaterial({ map: livedInTexture(i), transparent: true, alphaTest: 0.04, roughness: 0.82, metalness: 0.03, side: THREE.DoubleSide })),
     fridgeInterior: new THREE.MeshBasicMaterial({ map: fridgeInterior }),
     fridgeDoorInside: new THREE.MeshBasicMaterial({ map: fridgeDoorInside, side: THREE.FrontSide }),
     fridgeShelf: new THREE.MeshStandardMaterial({ color: 0x6d7777, transparent: true, opacity: 0.55, roughness: 0.28, metalness: 0.35 }),
@@ -1470,7 +1408,6 @@ export function buildFloor(scene, floorDef, opt) {
     futon: lam({ color: 0xa8a196 }),
     futon2: lam({ color: 0x7d7a72 }),
     pillow: lam({ color: 0xbdb6a8 }),
-    ghost: new THREE.MeshBasicMaterial({ map: generatedMirrorGhost, transparent: true, opacity: 0, depthWrite: false }),
   };
 
   /* --- 廊下の床・天井 --- */
