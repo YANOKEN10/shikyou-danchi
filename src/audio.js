@@ -17,7 +17,7 @@ const SAMPLE_FILES = {
   "door-handle": "door-handle.wav",
   "sudden-terror": "sudden-terror.wav",
   "insane-pursuit": "insane-pursuit.mp3",
-  "ghost-footsteps": "ghost-footsteps.mp3",
+  "detuned-memory": "detuned-memory.mp3",
 };
 
 export class Sound {
@@ -777,7 +777,7 @@ export class Sound {
 
   normalMusicOn() {
     if (this._normalMusic || !this.ready || this.muted) return;
-    const buffer = this.samples.get("ghost-footsteps");
+    const buffer = this.samples.get("detuned-memory");
     if (!buffer) return;
     const src = this.ctx.createBufferSource();
     const gain = this.ctx.createGain();
