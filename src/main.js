@@ -19,6 +19,11 @@ initLocale();
 const $ = (id) => document.getElementById(id);
 
 const snd = new Sound();
+// Autoplay where permitted; otherwise resume on the first title/home gesture.
+snd.setMenuMusic(true);
+const unlockMenuMusic = () => { if (snd._menuMusicWanted) snd.setMenuMusic(true); };
+window.addEventListener("pointerdown", unlockMenuMusic, { capture: true });
+window.addEventListener("keydown", unlockMenuMusic, { capture: true });
 const cloud = new Cloud();
 let game = null;
 let mode = "login";      // login | signup | guest
@@ -182,6 +187,7 @@ function ensureGame() {
   if (game) return game;
   game = new Game($("screen"), snd, cloud);
   game.onWantLogin = () => {
+    snd.setMenuMusic(true);
     fromPause = true;
     game.paused = true;
     mode = "login";
@@ -212,6 +218,7 @@ function bindTouch(g) {
 }
 
 async function begin(payload) {
+  snd.setMenuMusic(false);
   gate.classList.remove("show");
   $("pick").classList.remove("show");
   setMsg("");
@@ -222,6 +229,7 @@ async function begin(payload) {
   } catch (e) {
     // 3D が始められない端末。理由を出して、開いたままにしない
     gate.classList.add("show");
+    snd.setMenuMusic(true);
     setMsg("この端末では画面を描き始められませんでした。ブラウザを新しくするか、別の端末でお試しください。（" + (e && e.message ? e.message : "原因不明") + "）", "err");
     return;
   }
@@ -288,6 +296,7 @@ function drawRoster() {
 }
 
 function openLobby() {
+  snd.setMenuMusic(true);
   snd.unlock(); snd.ui();
   // 初期画面より手前にロビーを出し、開始後も初期画面がゲームを覆わないようにする。
   $("gate").classList.remove("show");

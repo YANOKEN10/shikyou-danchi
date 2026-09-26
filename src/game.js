@@ -171,6 +171,7 @@ export class Game {
     this.player.hasLight = Boolean(this.state.items.light);
     this.player.spare = this.state.spare | 0;
 
+    this.snd.setMenuMusic(false);
     this.snd.unlock();
     this.snd.ambienceOn();
 
@@ -1181,6 +1182,7 @@ export class Game {
 
   async startVersus(versus, floorNo, oniSlot, keys) {
     this.versus = versus;
+    this.snd.setMenuMusic(false);
     this.snd.unlock();
     this.snd.ambienceOn();
     this.ui.closeAll();

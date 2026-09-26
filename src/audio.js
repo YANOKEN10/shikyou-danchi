@@ -78,6 +78,7 @@ export class Sound {
         if (!res.ok) throw new Error(`音声を取得できません: ${res.status}`);
         const buffer = await this.ctx.decodeAudioData(await res.arrayBuffer());
         this.samples.set(name, buffer);
+        if (name === "detuned-memory" && this._menuMusicWanted) this.normalMusicOn();
       } catch (e) {
         // 通信や古いブラウザで失敗しても、各場面の WebAudio 合成音を鳴らして進行を守る。
       }
@@ -696,8 +697,9 @@ export class Sound {
   // 距離だけで心音を鳴らすと、まだ安全な巡回中まで追跡音楽になる。
   // 発見・目前・室内をまとめて受け取り、同じ場所でも状況に合う音層だけを残す。
   setThreat(x, state = {}) {
-    if (state.hunting) { this.normalMusicOff(); this.pursuitOn(); }
-    else { this.pursuitOff(); this.normalMusicOn(); }
+    this.setMenuMusic(false);
+    if (state.hunting) this.pursuitOn();
+    else this.pursuitOff();
     this.tension = clamp(x, 0, 1);
     this._threatMode = "calm";
     this._stopHeart(); this.breathOff(); this._dangerOff();
@@ -775,15 +777,22 @@ export class Sound {
     src.stop(this.t + 0.4);
   }
 
+  // Title/home only. Remember intent while the sample is still downloading.
+  setMenuMusic(enabled) {
+    this._menuMusicWanted = Boolean(enabled);
+    if (enabled) { this.pursuitOff(); this.unlock(); this.normalMusicOn(); }
+    else this.normalMusicOff();
+  }
+
   normalMusicOn() {
-    if (this._normalMusic || !this.ready || this.muted) return;
+    if (!this._menuMusicWanted || this._normalMusic || !this.ready || this.muted) return;
     const buffer = this.samples.get("detuned-memory");
     if (!buffer) return;
     const src = this.ctx.createBufferSource();
     const gain = this.ctx.createGain();
     src.buffer = buffer; src.loop = true;
     gain.gain.setValueAtTime(0, this.t);
-    gain.gain.linearRampToValueAtTime(0.22, this.t + 0.5);
+    gain.gain.linearRampToValueAtTime(0.12, this.t + 0.5);
     src.connect(gain); gain.connect(this.master);
     src.onended = () => { src.disconnect(); gain.disconnect(); };
     src.start();
@@ -800,6 +809,7 @@ export class Sound {
   }
 
   backgroundOff() {
+    this._menuMusicWanted = false;
     this.pursuitOff();
     this.normalMusicOff();
   }
