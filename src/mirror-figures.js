@@ -1,20 +1,20 @@
 import * as THREE from '../lib/three.module.js';
 
-// Render actual figures once into two shared, transparent portrait textures.
+// Keep the player reflection and use separately generated full-length/bust ghost images.
 // Mirror panes retain their own frames; portrait aspect ratios are never stretched.
 export class MirrorFigures {
-  constructor(renderer, ghost) {
+  constructor(renderer) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
     this.scene.add(new THREE.HemisphereLight(0xd7e3e9, 0x49423b, 2.4));
     const light = new THREE.DirectionalLight(0xffffff, 2); light.position.set(-2,3,4); this.scene.add(light);
     this.camera = new THREE.OrthographicCamera(-.7,.7,2.12,-.08,.1,15);
     this.camera.position.set(0,0,5); this.camera.lookAt(0,0,0);
-    this.ghost = ghost; this.scene.add(ghost);
-    const bounds = new THREE.Box3().setFromObject(ghost), size = bounds.getSize(new THREE.Vector3());
-    ghost.scale.multiplyScalar(1.8/size.y);
-    ghost.position.y -= bounds.min.y * 1.8/size.y;
-    ghost.traverse(o=>o.layers.set(0));
+    const loader=new THREE.TextureLoader();
+    this.ghostTextures=['full','bust'].map(kind=>{
+      const tex=loader.load(new URL('../assets/generated/mirror-ghost-'+kind+'-v3.png',import.meta.url).href);
+      tex.colorSpace=THREE.SRGBColorSpace; return tex;
+    });
     this.player = new THREE.Group(); this.scene.add(this.player);
     const skin = new THREE.MeshStandardMaterial({color:0x88796d,roughness:.85});
     const coat = new THREE.MeshStandardMaterial({color:0x404d58,roughness:.95});
@@ -38,18 +38,25 @@ export class MirrorFigures {
     for(const x of [-.045,.045]) part(ball(),hair,x,1.67,.116,.012,.007,.008);
     part(ball(),skin,0,1.635,.123,.018,.032,.023);
     part(new THREE.CylinderGeometry(.035,.035,.17,12),hair,-.315,.72,.025);
-    this.targets = [0,1].map(()=>new THREE.WebGLRenderTarget(384,600));
+    this.targets = [0].map(()=>new THREE.WebGLRenderTarget(384,600));
   }
   render(time=0) {
     const r=this.renderer, target=r.getRenderTarget(), color=r.getClearColor(new THREE.Color()), alpha=r.getClearAlpha();
     r.setClearColor(0,0);
     this.player.rotation.y=Math.sin(time*.5)*.025;
-    for(let i=0;i<2;i++) {this.player.visible=i===0;this.ghost.visible=i===1;r.setRenderTarget(this.targets[i]);r.clear();r.render(this.scene,this.camera);}
+    for(let i=0;i<1;i++) {this.player.visible=true;r.setRenderTarget(this.targets[i]);r.clear();r.render(this.scene,this.camera);}
     r.setRenderTarget(target);r.setClearColor(color,alpha);
   }
   apply(f,player) {
     if(!f.reflection) return;
-    if(!f.reflection.material.map){f.reflection.material.map=this.targets[0].texture;f.mesh.material.map=this.targets[1].texture;f.reflection.material.needsUpdate=f.mesh.material.needsUpdate=true;}
+    if(!f.reflection.material.map){f.reflection.material.map=this.targets[0].texture;const tall=f.mirror.geometry.parameters.height>1.2;
+      f.mesh.material.map=this.ghostTextures[tall?0:1];
+      const height=f.mirror.geometry.parameters.height*.92, width=f.mirror.geometry.parameters.width*.94;
+      // Contain the image within the glass with its original 2:3 aspect ratio.
+      const fittedWidth=tall?width:Math.min(width,height*2/3), fittedHeight=tall?height:fittedWidth*3/2;
+      f.mesh.geometry.dispose();f.mesh.geometry=new THREE.PlaneGeometry(fittedWidth,fittedHeight);
+      if(tall){const uv=f.mesh.geometry.attributes.uv,crop=(fittedWidth/fittedHeight)/(2/3);for(let i=0;i<uv.count;i++)uv.setX(i,.5+(uv.getX(i)-.5)*crop);}
+      f.reflection.material.needsUpdate=f.mesh.material.needsUpdate=true;}
     const angle=f.mesh.rotation.y, dx=player.pos.x-f.x,dz=player.pos.z-f.z;
     const lateral=Math.cos(angle)*dx-Math.sin(angle)*dz;
     const normal=Math.sin(angle)*dx+Math.cos(angle)*dz;

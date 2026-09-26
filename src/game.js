@@ -677,7 +677,7 @@ export class Game {
       const facing = dist < 0.01 ? 1 : (dx / dist) * fwd.x + (dz / dist) * fwd.z;
 
       if (f.kind === "mirror") {
-        if (!this.mirrorFigures) this.mirrorFigures = new MirrorFigures(this.renderer, B.buildEntity());
+        if (!this.mirrorFigures) this.mirrorFigures = new MirrorFigures(this.renderer);
         if (this._mirrorFrame == null || this.state.seconds - this._mirrorFrame > .12) { this.mirrorFigures.render(this.state.seconds); this._mirrorFrame = this.state.seconds; }
         this.mirrorFigures.apply(f, this.player);
         // 見ているあいだに、うしろへ何かが立つ
