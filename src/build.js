@@ -1,3 +1,4 @@
+import { roomStyle, styleWalls, sofa, styledTable, deskChair } from './interior-style.js';
 // ============================================================
 //  四号棟の組み立て
 //   ・団地の外廊下は「片側に住戸の扉、片側に手すりと夜」
@@ -184,6 +185,7 @@ function unitMaterials(mats, room) {
 }
 
 function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
+  mats = roomStyle(mats, room);
   const z0 = -0.16, z1 = z0 - D.UNIT_D;
   const x0 = dx - D.UNIT_W / 2, x1 = dx + D.UNIT_W / 2;
   const H = 2.3;
@@ -194,7 +196,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   const f1 = plane(D.UNIT_W, z0 - zMid, mats.entryFloor);      // 手前は台所の床
   f1.rotation.x = -Math.PI / 2;
   put(g, f1, dx, 0.01, (z0 + zMid) / 2);
-  const f2 = plane(D.UNIT_W, zMid - z1, unitMaterials(mats, room));
+  const f2 = plane(D.UNIT_W, zMid - z1, mats.style === 'western' ? mats.wood_floor : unitMaterials(mats, room));
   f2.rotation.x = -Math.PI / 2;
   put(g, f2, dx, 0.012, (zMid + z1) / 2);
 
@@ -280,6 +282,7 @@ function buildUnit(g, col, inter, unit, dx, mats, room, fx) {
   };
 
   commonRoom(C);
+  styleWalls(C);
   commonWetArea(C);
   commonClutter(C);
   (FURNISH[room.kind] || FURNISH.kitchen)(C);
@@ -654,10 +657,10 @@ function furnishHome(C) {
   const sets = {
     kitchen: ["dresser"], butsudan: ["dresser", "sideTable"], boxes: ["dresser"],
     child: ["bed", "desk"], futon: ["dresser", "sideTable"], flowers: ["sideTable", "dresser"],
-    office: ["dresser", "sideTable"], tv: ["bed", "sideTable"], dolls: ["bed", "dresser"],
+    office: ["sofa", "sideTable"], tv: ["sofa", "sideTable"], dolls: ["bed", "dresser"],
     letter: ["desk", "dresser"], home: ["bed", "dresser"], mirrors: ["dresser"], bath: ["sideTable"],
   };
-  const sizes = {bed:[1.05,1.95], dresser:[1.0,.5], desk:[1.15,.65], sideTable:[.6,.55]};
+  const sizes = {sofa:[1.6,.78], bed:[1.05,1.95], dresser:[1.0,.5], desk:[1.15,.65], sideTable:[.6,.55]};
   for (const kind of sets[C.room.kind] || []) {
     const [w,d] = sizes[kind];
     const candidates = [];
@@ -676,7 +679,9 @@ function furnishHome(C) {
     g.userData.furniture=kind; g.userData.roomNo=C.unit.no; C.g.add(g);
     const part=(ww,h,dd,mat,px,py,pz)=>put(g,box(ww,h,dd,mat),px,py,pz);
     const m=C.mats;
-    if(kind==='bed') {
+    if(kind==='sofa') {
+      sofa(g,w,d,m);
+    } else if(kind==='bed') {
       part(w,.2,d,m.darkwood,0,.25,0); part(w-.08,.18,d-.1,m.cushion,0,.44,0);
       part(w,.85,.08,m.wood,0,.48,-d/2+.04);
       const pillow = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12), m.pillow);
@@ -701,6 +706,7 @@ function furnishHome(C) {
       if(kind==='desk'){part(w*.36,.18,d-.04,m.darkwood,w*.27,h-.12,0);part(.15,.025,.035,m.steel,w*.27,h-.12,d/2);}
     }
     C.blk(x-w/2,z-d/2,x+w/2,z+d/2);
+    if(kind==='desk') deskChair(C,x,z+d/2+.44);
   }
 }
 function buildDresser(C,w,h,d,x,z) {
@@ -728,12 +734,13 @@ function buildDresser(C,w,h,d,x,z) {
 function cabinet(C,w,h,d,x,z,y=0) {
   const g=new THREE.Group();g.position.set(x,y,z);g.userData.furniture='cabinet';C.g.add(g);
   const m=C.mats;
+  const paint=z>C.zMid?m.cabinetPaint:m.wood;
   put(g,box(w,h,d,m.darkwood),0,h/2,0);
   put(g,box(w+.035,.035,d+.025,m.wood),0,h,0);
   for(const sign of [-1,1]) {
     const cx=sign*w/4;
-    put(g,box(w/2-.018,h-.07,.025,m.wood),cx,h/2,d/2+.005);
-    put(g,box(w/2-.09,h-.17,.013,m.darkwood),cx,h/2,d/2+.022);
+    put(g,box(w/2-.018,h-.07,.025,paint),cx,h/2,d/2+.005);
+    put(g,box(w/2-.09,h-.17,.013,paint),cx,h/2,d/2+.022);
     put(g,box(.018,.12,.032,m.steel),sign*.055,h*.6,d/2+.046);
   }
   put(g,box(w-.06,.055,.025,m.darkwood),0,.027,d/2+.028);
@@ -1203,17 +1210,7 @@ function writingTable(C,w,h,d,x,z) {
   C.pb(.12,.016,.025,C.mats.steel,x,h-.10,z+d/2+.014);
 }
 
-function lowTable(C, px, pz) {
-  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 16), C.mats.wood);
-  t.position.set(px, 0.34, pz);
-  C.g.add(t);
-  for(const xx of [-.28,.28])for(const zz of [-.28,.28]) {
-    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,.30,10),C.mats.darkwood);
-    put(C.g,leg,px+xx,.15,pz+zz);
-  }
-  for(const zz of [-.28,.28])C.pb(.62,.075,.04,C.mats.darkwood,px,.27,pz+zz);
-  C.blk(px - 0.52, pz - 0.52, px + 0.52, pz + 0.52);
-}
+function lowTable(C, px, pz) { styledTable(C, px, pz); }
 
 // 鏡にうつるもの（ふだんは見えない）
 function addGhost(C, mirror, px, py, pz, ry, w, h) {
