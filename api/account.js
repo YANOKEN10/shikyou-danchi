@@ -24,7 +24,7 @@ module.exports = async function handler(req, res) {
   if (!L.configured()) { L.notReady(res); return; }
 
   const claim = L.readToken(L.bearer(req));
-  if (!claim) { res.status(401).json({ error: "auth", message: "ログインし直してください。" }); return; }
+  if (!claim) { res.status(401).json({ error: "session", message: "ログインし直してください。" }); return; }
 
   const b = L.body(req);
   const action = String(b.action || "");

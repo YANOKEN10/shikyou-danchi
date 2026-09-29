@@ -98,21 +98,23 @@ function setPw(u, pw) {
 // 間違えたときは少し待たせる（総当たり対策）
 function slowDown() { return new Promise((r) => setTimeout(r, 400 + Math.random() * 300)); }
 
-/* --- ログインの券（1年有効） ---------------------------------- */
+/* --- ログインの券（端末に継続保存） ---------------------------------- */
 function makeToken(id) {
-  const b = Buffer.from(JSON.stringify({ id: id, exp: Date.now() + YEAR })).toString("base64url");
+  const b = Buffer.from(JSON.stringify({ id: id, persistent: true })).toString("base64url");
   const sig = crypto.createHmac("sha256", SECRET).update(b).digest("base64url");
   return b + "." + sig;
 }
 function readToken(tok) {
   if (!tok || String(tok).indexOf(".") < 0) return null;
   const parts = String(tok).split(".");
+  if (parts.length !== 2) return null;
   const want = crypto.createHmac("sha256", SECRET).update(parts[0]).digest("base64url");
   if (parts[1].length !== want.length) return null;
   if (!crypto.timingSafeEqual(Buffer.from(parts[1]), Buffer.from(want))) return null;
   try {
     const d = JSON.parse(Buffer.from(parts[0], "base64url").toString());
-    if (!d.id || d.exp < Date.now()) return null;
+    if (typeof d.id !== "string" || !d.id) return null;
+    if (d.persistent !== true && (!Number.isFinite(d.exp) || d.exp < Date.now())) return null;
     return d;
   } catch (e) { return null; }
 }

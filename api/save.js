@@ -15,14 +15,15 @@ module.exports = async function handler(req, res) {
   if (!L.configured()) { L.notReady(res); return; }
 
   const claim = L.readToken(L.bearer(req));
-  if (!claim) { res.status(401).json({ error: "auth", message: "ログインし直してください。" }); return; }
+  if (!claim) { res.status(401).json({ error: "session", message: "ログインし直してください。" }); return; }
 
   try {
     const user = await L.readUser(claim.id);
     if (!user) { res.status(404).json({ error: "gone", message: "アカウントが見つかりませんでした。" }); return; }
 
     if (req.method === "GET") {
-      res.status(200).json({ user: L.publicUser(user), payload: user.payload || null });
+      res.setHeader("Cache-Control", "no-store");
+      res.status(200).json({ user: L.publicUser(user), payload: user.payload || null, token: claim.persistent === true ? undefined : L.makeToken(user.id) });
       return;
     }
 

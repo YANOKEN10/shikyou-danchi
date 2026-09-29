@@ -431,7 +431,13 @@ $("codeIn").addEventListener("input", () => {
     cont.style.display = "block";
     $("contName").textContent = cloud.display;
     cont.onclick = async () => { snd.unlock(); snd.ui(); cloud.guestOnly = false; await afterAuth(); };
-    // ログイン欄は「別のアカウントで入る」用に残しておく
+    // A remembered device opens as signed in, without asking for credentials again.
+    const loginParts=[document.querySelector('#gate .tabs'), $('fields'), $('go'), $('skip')];
+    loginParts.forEach(el=>el.style.display='none');
+    const change=document.createElement('button');change.type='button';change.className='ghost';change.id='switchAccount';
+    change.textContent=({en:'Use another account',es:'Usar otra cuenta'})[document.documentElement.lang] || '別のアカウントで入る';
+    cont.after(change);
+    change.onclick=()=>{loginParts.forEach(el=>el.style.display='');change.remove();showFields();};
   }
 
   // 画面の向き・拡大の抑制

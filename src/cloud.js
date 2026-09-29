@@ -5,10 +5,11 @@
 //       無い人 … 名前 ＋ 合言葉
 //       有る人 … 名前でも メールでも ログインできる
 //   ・合言葉は端末に一切保存しない。保存するのは
-//     サーバーが署名した「券（トークン）」だけ（1年で切れる）
+//     サーバーが署名した「券（トークン）」だけ（ログアウトするまで端末に保持）
 //   ・ログインしない人のために、端末内だけの保存も用意する
 // ============================================================
 
+const PROFILE = "shikyou:session-profile";
 const TOK = "shikyou:token";     // ログインの券
 const LOCAL = "shikyou:local";   // この端末だけの記録
 const OWNER = "shikyou:owner";   // その記録が誰のものか（空ならログインしていない人の記録）
@@ -32,6 +33,7 @@ export class Cloud {
 
   setToken(t) {
     this.token = t || "";
+    if (!t) ls(() => localStorage.removeItem(PROFILE));
     ls(() => (t ? localStorage.setItem(TOK, t) : localStorage.removeItem(TOK)));
   }
 
@@ -45,6 +47,7 @@ export class Cloud {
     const h = { "Content-Type": "application/json" };
     if (this.token) h.Authorization = "Bearer " + this.token;
 
+    const sentToken = this.token;
     let r;
     try {
       r = await fetch(path, {
@@ -61,7 +64,7 @@ export class Cloud {
 
     if (!r.ok) {
       // 券が切れていた／消えていた
-      if (r.status === 401) { this.setToken(""); this.user = null; }
+      if (this.token === sentToken && ((r.status === 401 && d?.error === "session") || (r.status === 404 && d?.error === "gone"))) { this.signOut(); }
 
       // サーバー機能が置かれていない場所で開いたとき
       if (r.status === 404 && !d) {
@@ -74,19 +77,31 @@ export class Cloud {
         why: (d && d.message) || "うまくいきませんでした（" + r.status + "）",
       };
     }
+    if (this.token === sentToken && d?.token && path !== "/api/auth") this.setToken(d.token);
     return { ok: true, data: d || {} };
   }
 
   /* ---------------- 出入り ---------------- */
 
   // 起動時、券が生きていれば黙ってログイン状態に戻す
+  cacheProfile() {
+    if (this.token && this.user) ls(() => localStorage.setItem(PROFILE, JSON.stringify({ token:this.token, user:this.user })));
+  }
+
   async restore() {
     if (!this.token) return false;
+    const token = this.token;
     const r = await this.call("/api/save");
-    if (!r.ok) return false;
+    if (!this.token || (this.token !== token && this.token !== r.data?.token)) return false;
+    if (!r.ok) {
+      const saved=ls(()=>JSON.parse(localStorage.getItem(PROFILE)),null);
+      if ((r.offline || r.status >= 500) && saved?.token === this.token && saved.user?.id) {this.user=saved.user;this.mode="cloud";return true;}
+      return false;
+    }
     this.user = r.data.user;
     this.rev = (r.data.user && r.data.user.rev) | 0;
     this.mode = "cloud";
+    this.cacheProfile();
     return true;
   }
 
