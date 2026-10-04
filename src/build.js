@@ -1,3 +1,4 @@
+import { cc0Head } from './cc0-human.js';
 import { roomStyle, styleWalls, sofa, styledTable, deskChair } from './interior-style.js';
 // ============================================================
 //  四号棟の組み立て
@@ -1768,6 +1769,9 @@ export function buildEntity() {
     veil: backHair, hairStrands, pose: "stand", phase: Math.random() * 6,
     twitch: 2 + Math.random() * 4, tilt: 0, H, hemT: Math.random() * 10,
   };
+  const realisticHead=cc0Head(true);realisticHead.scale.setScalar(1.4);realisticHead.position.set(0,-1.64*1.4,0);
+  headPivot.add(realisticHead);g.userData.cc0Head=realisticHead;
+  realisticHead.userData.ready.then(()=>{if(realisticHead.userData.error)return;face.visible=false;skull.visible=false;neck.visible=false;backHair.visible=false;hairStrands.forEach(h=>h.visible=false);realisticHead.traverse(o=>o.layers.set(1));});
   setEntityPose(g, "stand", true);
   return g;
 }
@@ -1850,6 +1854,7 @@ export function buildSurvivor(name) {
 
 export function animateEntity(ent, dt, moving) {
   const u = ent.userData;
+  u.cc0Head?.userData.animate?.(u.phase||0,u.hunting?.8:.28);
   dt=Math.min(dt,0.1);
   const ease=1-Math.exp(-dt*4);
   u.motion+=((moving?1:0)-u.motion)*ease;
