@@ -6,6 +6,8 @@
 import { tr, language } from "./i18n.js";
 import { MEMOS, MEMO_ORDER, ITEMS, HELP_PC, HELP_TOUCH } from "./story.js";
 
+import { showAcquired, itemImage } from './item-acquired.js';
+
 const $ = (id) => document.getElementById(id);
 
 export class UI {
@@ -152,6 +154,15 @@ export class UI {
     });
   }
 
+  showItem(id, count) { showAcquired(this, id, ITEMS[id], count); }
+
+  closeItem() {
+    if (this.open !== 'item') return;
+    this.itemDialog.close();
+    this.open = null;
+    if (this.onClose) this.onClose();
+  }
+
   /* ---------- メモを読む ---------- */
 
   showMemo(id) {
@@ -202,6 +213,11 @@ export class UI {
         let extra = "";
         if (k === "battery") extra = "　×" + state.spare;
         d.textContent = "・" + ((ITEMS[k] && ITEMS[k].name) || k) + extra;
+        if (ITEMS[k]) {
+          const label=document.createElement('span'); label.textContent=d.textContent;
+          const img=document.createElement('img'); img.src=itemImage(k); img.alt=''; img.width=64; img.height=64;
+          d.replaceChildren(img,label); d.classList.add('has-item-art');
+        }
         inv.appendChild(d);
       });
     }

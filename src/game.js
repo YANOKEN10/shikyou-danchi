@@ -64,8 +64,10 @@ export class Game {
     window.addEventListener("keydown", (e) => {
       if (!this.ui.open || this.ui.open === "ending") return;
       if (e.code !== "Escape" && e.code !== "Tab") return;
+      if (this.ui.open === 'item' && e.code === 'Tab') return;
       e.preventDefault();
       if (this.ui.open === "reader") this.ui.closeReader();
+      else if (this.ui.open === 'item') this.ui.closeItem();
       else if (this.ui.open === "book") this.ui.closeBook();
       else if (this.ui.open === "pause") this.resume();
     });
@@ -990,6 +992,7 @@ export class Game {
       }
       this.state.spare = p.spare;
       this.snd.pickup();
+      this.ui.showItem(it.id, p.spare);
       // 説明文だけでは取得できたか分かりにくいため、品名と完了を最初にはっきり表示する。
       this.ui.sayNow((info ? info.name : "品物") + "を取りました。");
       if (it.note) this.ui.say(it.note);
