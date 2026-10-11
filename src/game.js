@@ -461,7 +461,7 @@ export class Game {
     if (this.versus && this.versus.on) {
       this.versus.update(dt);
       this._interact();
-      this.ui.setObjective("");
+      this.ui.setObjective(this.versus.hint || "");
       this.ui.setBattery(p.battery, p.hasLight);
       this.ui.setStamina(p.stamina);
       this.ui.tickSub(dt);

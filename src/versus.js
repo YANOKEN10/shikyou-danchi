@@ -1,3 +1,4 @@
+import {vsText, captureNotice} from './versus-presentation.js';
 // ============================================================
 //  鬼ごっこ（非対称）
 //   ・1人が「それ」、残りが住人
@@ -13,7 +14,7 @@ import * as TX from "./textures.js";
 export const RULES = {
   TIME: 300,          // 制限時間（秒）
   KEYS: 3,            // 逃げるのに要る鍵の数
-  CATCH: 0.95,        // つかまえられる間合い
+  CATCH: 1.15,        // つかまえられる間合い
   RESCUE: 1.35,       // 助けられる間合い
   RESCUE_SEC: 4,      // 助けるのにかかる時間
   LIVES: 3,           // つかまってよい回数
@@ -115,6 +116,7 @@ export class Versus {
 
   stop() {
     this.on = false;
+    const notice=document.getElementById('captureNotice');if(notice)notice.hidden=true;
     this.net.onMessage = null;
     this.players.forEach((p) => { if (p.mesh) this.game.scene.remove(p.mesh); });
     this.players.clear();
@@ -235,6 +237,8 @@ export class Versus {
     // ほかの人を、なめらかに寄せる
     this.players.forEach((p) => {
       if (!p.mesh) return;
+      const moving=Math.hypot(p.x-p.mesh.position.x,p.z-p.mesh.position.z)>.012;
+      p.mesh.userData.animate?.(dt,moving);
       p.mesh.position.x += (p.x - p.mesh.position.x) * Math.min(1, dt * 9);
       p.mesh.position.z += (p.z - p.mesh.position.z) * Math.min(1, dt * 9);
       const face = p.slot === this.oni ? p.yaw + Math.PI : p.yaw + Math.PI;
@@ -244,6 +248,7 @@ export class Versus {
       p.mesh.rotation.y += d * Math.min(1, dt * 8);
       p.mesh.visible = p.st !== ST.SAFE;
       if (p.mesh.userData && p.mesh.userData.setHeld) p.mesh.userData.setHeld(p.st === ST.HELD, p.st === ST.OUT);
+      p.mesh.visible=p.st!==ST.SAFE&&p.st!==ST.OUT;
       if (p.slot === this.oni) B.animateEntity(p.mesh, dt, true);
     });
 
@@ -294,13 +299,14 @@ export class Versus {
     const alive = [];
     this.players.forEach((p) => { if (p.slot !== this.oni && p.st !== ST.OUT && p.st !== ST.SAFE) alive.push(p); });
 
+    this.players.forEach(p=>p.grace=Math.max(0,(p.grace||0)-dt));
     // つかまえる
     if (oni) {
       alive.forEach((p) => {
         if (p.st !== ST.FREE) return;
-        if (Math.hypot(p.x - oni.x, p.z - oni.z) < RULES.CATCH) {
+        if (!(p.grace>0) && Math.hypot(p.x - oni.x, p.z - oni.z) < RULES.CATCH && this.game.floor.col.clear(oni.x,oni.z,p.x,p.z)) {
           p.st = ST.HELD;
-          p.held = 0;
+          p.held = 0; p.holdT=0;
           p.lives -= 1;
           this._event({ e: "caught", s: p.slot, lives: p.lives });
         }
@@ -313,7 +319,7 @@ export class Versus {
       let helper = false;
       alive.forEach((q) => {
         if (q.slot === p.slot || q.st !== ST.FREE) return;
-        if (Math.hypot(p.x - q.x, p.z - q.z) < RULES.RESCUE) helper = true;
+        if (Math.hypot(p.x - q.x, p.z - q.z) < RULES.RESCUE && this.game.floor.col.clear(q.x,q.z,p.x,p.z)) helper = true;
       });
       if (helper) {
         p.held += dt;
@@ -434,12 +440,13 @@ export class Versus {
     if (o.e === "caught") {
       const p = this.players.get(o.s);
       if (p) { p.st = ST.HELD; p.lives = o.lives; }
+      captureNotice(g.ui, this.amOni?vsText('つかまえた','CAPTURED','CAPTURADO'):o.s===this.me?vsText('つかまった','YOU WERE CAUGHT','TE HAN ATRAPADO'):vsText('仲間がつかまった','TEAMMATE CAUGHT','COMPAÑERO ATRAPADO'),name(o.s)+' — '+vsText('残り ', 'Lives left: ', 'Vidas restantes: ')+Math.max(0,o.lives));
       g.snd.stinger("caught");
       g.ui.hit();
       g.ui.sayNow(o.s === this.me ? "つかまった。仲間が来るまで動けない。" : name(o.s) + " がつかまった。");
     } else if (o.e === "rescued" || o.e === "escaped_hold") {
       const p = this.players.get(o.s);
-      if (p) { p.st = ST.FREE; p.held = 0; }
+      if (p) { p.st = ST.FREE; p.held = 0; p.holdT=0; p.grace=3; }
       g.snd.pickup();
       g.ui.sayNow(o.s === this.me ? "助けてもらった。" : name(o.s) + " が起きあがった。");
     } else if (o.e === "out") {
@@ -493,11 +500,13 @@ export class Versus {
     if (this.amOni) {
       let left = 0;
       this.players.forEach((p) => { if (p.slot !== this.oni && p.st !== ST.OUT && p.st !== ST.SAFE) left++; });
-      s += "　のこり " + left + "人";
+      const held=[...this.players.values()].filter(p=>p.slot!==this.oni&&p.st===ST.HELD).length;
+      s += vsText('　逃走 '+(left-held)+'　捕獲中 '+held,'  Free '+(left-held)+'  Caught '+held,'  Libres '+(left-held)+'  Atrapados '+held);
     } else {
       s += "　鍵 " + got + "/" + RULES.KEYS;
       if (me) s += "　あと" + Math.max(0, me.lives) + "回";
     }
     g.ui.setVersus(s, this.amOni);
+    this.hint=this.amOni?vsText('住人に近づくと自動で捕獲（ボタン不要）','Approach a resident to catch them automatically.','Acércate a un residente para atraparlo automáticamente.'):me?.st===ST.HELD?vsText('捕獲中：仲間の救助を待ってください','Caught: wait for a teammate to rescue you.','Atrapado: espera a que te rescaten.'):vsText('鍵を3本集めて階段へ。捕まった仲間はそばで救助。','Collect 3 keys. Stand near caught teammates to rescue them.','Reúne 3 llaves. Acércate a tus compañeros atrapados para rescatarlos.');
   }
 }
