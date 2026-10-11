@@ -377,7 +377,7 @@ export class Game {
     p.update(dt, f.col);
 
     // 住戸の出入り
-    const rec = this._insideUnit();
+    const rec = this.versus?.on ? null : this._insideUnit();
     p.inUnit = Boolean(rec);
     this.roomVisibility.intensity += ((rec ? 1.55 : 0) - this.roomVisibility.intensity) * Math.min(1, dt * 5);
     this._ensureEmergencyBattery();
@@ -418,8 +418,7 @@ export class Game {
       }
     }
 
-    this._roomFx(dt);
-    this.haunt.update(dt);
+    if(!this.versus?.on){this._roomFx(dt);this.haunt.update(dt);}
 
     // 懐中電灯
     const on = p.lightOn && p.hasLight && p.battery > 0;
@@ -877,6 +876,11 @@ export class Game {
   async _doInteract(it) {
     const p = this.player;
 
+    if(this.versus?.on && ['up','down','exit'].includes(it.kind)){
+      if(it.kind==='up'||it.kind==='down')await this.versus.travel(it.kind==='up'?1:-1);
+      else this.ui.sayNow(this.versus.keys.filter(k=>k.by).length>=3?'外へ出る':'鍵を三本あつめて、階段室から出る。走れば聞かれる。');
+      return;
+    }
     if (it.kind === "door") {
       const d = it.door;
       if (!d.canEnter) {

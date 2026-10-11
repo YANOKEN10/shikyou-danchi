@@ -1,3 +1,4 @@
+import {prepareFloor,arenaFloor,travel} from './versus-building.js';
 import {vsText, captureNotice} from './versus-presentation.js';
 // ============================================================
 //  鬼ごっこ（非対称）
@@ -12,7 +13,7 @@ import * as B from "./build.js";
 import * as TX from "./textures.js";
 
 export const RULES = {
-  TIME: 300,          // 制限時間（秒）
+  TIME: 600,          // 制限時間（秒）
   KEYS: 3,            // 逃げるのに要る鍵の数
   CATCH: 1.15,        // つかまえられる間合い
   RESCUE: 1.35,       // 助けられる間合い
@@ -32,6 +33,7 @@ export class Versus {
     this.oni = "";              // 鬼の slot
     this.players = new Map();   // slot -> 状態
     this.keys = [];
+    this.floors ||= new Map();
     this.timeLeft = RULES.TIME;
     this.over = null;           // "oni" | "nige"
     this.sendAcc = 0;
@@ -61,19 +63,17 @@ export class Versus {
       this.players.set(r.slot, {
         slot: r.slot, name: r.name, x: 2, z: 1.2, yaw: 0,
         light: false, noise: 0, st: ST.FREE, lives: RULES.LIVES,
-        keys: 0, held: 0, mesh: null,
+        keys: 0, held: 0, mesh: null, floor: 1,
       });
     });
 
-    await g.loadFloor(floorNo, 0, true);
+    await g.loadFloor(1, 0, true);
     // 物語のしかけは使わない
     g.stalkers.clear();
     g.appar.hide();
-    // 階の移動はしない。扉の開け閉めだけ残す
-    g.floor.inter = g.floor.inter.filter((i) => i.kind === "door" || i.kind === "sdoor");
-    g.floor.doors.forEach((d) => { if (d.build) d.build(); });
+    this.floors.set(1,prepareFloor(g.floor,1));
 
-    if (keys && keys.length) this.keys = keys.map((k) => ({ x: k.x, z: k.z, by: null, mesh: null }));
+    if (keys && keys.length) this.keys = keys.map((k) => ({ x: k.x, z: k.z, floor:k.floor||1, by: null, mesh: null }));
     else this._placeKeys();
     this._makeKeyMeshes();
 
@@ -122,8 +122,10 @@ export class Versus {
     this.players.clear();
     this.keys.forEach((k) => { if (k.mesh) this.game.scene.remove(k.mesh); });
     this.keys = [];
+    this.floors ||= new Map();
     this.ripples.forEach((r) => this.game.scene.remove(r.mesh));
     this.ripples = [];
+    this.floors.forEach(f=>{if(f!==this.game.floor)B.disposeFloor(this.game.scene,f);});this.floors.clear();
     this.game.amb.intensity = 0.30;
     this.game.scene.fog.density = 0.062;
     this.game.player.speedMul = 1;
@@ -132,26 +134,9 @@ export class Versus {
 
   /* ---------------- 鍵 ---------------- */
 
-  _placeKeys() {
-    const g = this.game;
-    const spots = [];
-    // 住戸の中と、廊下の端のほう
-    g.floor.doors.forEach((d) => {
-      if (d.unitBounds) spots.push({ x: d.dx + (Math.random() - 0.5) * 2.4, z: d.unitBounds.z1 + 1.2 + Math.random() * 2.4 });
-    });
-    for (let i = 0; i < 4; i++) spots.push({ x: 3 + Math.random() * (g.floor.len - 6), z: 0.7 + Math.random() * 1.4 });
-    // ばらけるように選ぶ
-    const picked = [];
-    for (let n = 0; n < RULES.KEYS && spots.length; n++) {
-      let best = 0, bestD = -1;
-      spots.forEach((s, i) => {
-        const d = picked.length ? Math.min.apply(null, picked.map((p) => Math.hypot(p.x - s.x, p.z - s.z))) : 999;
-        if (d > bestD) { bestD = d; best = i; }
-      });
-      picked.push(spots.splice(best, 1)[0]);
-    }
-    this.keys = picked.map((p) => ({ x: p.x, z: p.z, by: null, mesh: null }));
-  }
+  _placeKeys() { this.keys=[2,3,5].map(floor=>({floor,x:12,z:1.2,by:null,mesh:null})); }
+
+  travel(delta) { return travel(this,delta); }
 
   _makeKeyMeshes() {
     const g = this.game;
@@ -200,7 +185,7 @@ export class Versus {
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.05, z);
     this.game.scene.add(m);
-    this.ripples.push({ mesh: m, t: 0, size: size });
+    this.ripples.push({ mesh: m, t: 0, size: size, floor:this.game.state.floor });
   }
 
   /* ---------------- 毎フレーム ---------------- */
@@ -217,12 +202,14 @@ export class Versus {
     me.yaw = g.player.yaw;
     me.light = g.player.lightOn;
     me.noise = g.player.noise;
+    me.floor = g.state.floor;
 
     // つかまっているあいだは動けない
-    g.player.frozen = (me.st === ST.HELD || me.st === ST.OUT || Boolean(this.over));
+    g.player.frozen = (me.st === ST.HELD || me.st === ST.OUT || Boolean(this.over) || this.travelling);
 
     // 波紋
     this.ripples.forEach((r) => {
+      r.mesh.visible=r.floor===me.floor;
       r.t += dt;
       const k = r.t / 1.6;
       r.mesh.scale.setScalar(1 + k * r.size * 7);
@@ -248,14 +235,14 @@ export class Versus {
       p.mesh.rotation.y += d * Math.min(1, dt * 8);
       p.mesh.visible = p.st !== ST.SAFE;
       if (p.mesh.userData && p.mesh.userData.setHeld) p.mesh.userData.setHeld(p.st === ST.HELD, p.st === ST.OUT);
-      p.mesh.visible=p.st!==ST.SAFE&&p.st!==ST.OUT;
+      p.mesh.visible=p.st!==ST.SAFE&&p.st!==ST.OUT&&p.floor===me.floor;
       if (p.slot === this.oni) B.animateEntity(p.mesh, dt, true);
     });
 
     // 鍵の見た目
     this.keys.forEach((k) => {
       if (!k.mesh) return;
-      k.mesh.visible = !k.by && !this.amOni;      // 鬼には鍵は見えない
+      k.mesh.visible = !k.by && !this.amOni && k.floor===me.floor;      // 鬼には鍵は見えない
       k.mesh.rotation.y += dt * 1.4;
       k.mesh.position.y = 0.55 + Math.sin(performance.now() * 0.002 + k.x) * 0.04;
     });
@@ -266,7 +253,7 @@ export class Versus {
       if (this.ripAcc > 0.32) {
         this.ripAcc = 0;
         this.players.forEach((p) => {
-          if (p.slot === this.oni || p.st !== ST.FREE) return;
+          if (p.slot === this.oni || p.st !== ST.FREE || p.floor!==me.floor) return;
           if ((p.noise || 0) > 0.3) this._ripple(p.x, p.z, p.noise);
         });
       }
@@ -281,7 +268,7 @@ export class Versus {
       if (this.isHost) this._sendState();
       else this.net.toHost({
         t: "p", x: +me.x.toFixed(2), z: +me.z.toFixed(2), yaw: +me.yaw.toFixed(2),
-        li: me.light ? 1 : 0, n: +me.noise.toFixed(2), a: this.wantAct ? 1 : 0,
+        fl: me.floor, li: me.light ? 1 : 0, n: +me.noise.toFixed(2), a: this.wantAct ? 1 : 0,
       });
       this.wantAct = false;
     }
@@ -304,7 +291,7 @@ export class Versus {
     if (oni) {
       alive.forEach((p) => {
         if (p.st !== ST.FREE) return;
-        if (!(p.grace>0) && Math.hypot(p.x - oni.x, p.z - oni.z) < RULES.CATCH && this.game.floor.col.clear(oni.x,oni.z,p.x,p.z)) {
+        if (p.floor===oni.floor && !(p.grace>0) && Math.hypot(p.x - oni.x, p.z - oni.z) < RULES.CATCH && arenaFloor(this,p.floor).col.clear(oni.x,oni.z,p.x,p.z)) {
           p.st = ST.HELD;
           p.held = 0; p.holdT=0;
           p.lives -= 1;
@@ -319,7 +306,7 @@ export class Versus {
       let helper = false;
       alive.forEach((q) => {
         if (q.slot === p.slot || q.st !== ST.FREE) return;
-        if (Math.hypot(p.x - q.x, p.z - q.z) < RULES.RESCUE && this.game.floor.col.clear(q.x,q.z,p.x,p.z)) helper = true;
+        if (p.floor===q.floor && Math.hypot(p.x - q.x, p.z - q.z) < RULES.RESCUE && arenaFloor(this,p.floor).col.clear(q.x,q.z,p.x,p.z)) helper = true;
       });
       if (helper) {
         p.held += dt;
@@ -346,7 +333,7 @@ export class Versus {
       if (p.slot === this.oni || p.st !== ST.FREE) return;
       this.keys.forEach((k, i) => {
         if (k.by) return;
-        if (Math.hypot(p.x - k.x, p.z - k.z) < 1.0) {
+        if (p.floor===k.floor && Math.hypot(p.x - k.x, p.z - k.z) < 1.0) {
           k.by = p.slot;
           p.keys += 1;
           this._event({ e: "key", s: p.slot, i: i });
@@ -359,7 +346,7 @@ export class Versus {
     if (got >= RULES.KEYS) {
       this.players.forEach((p) => {
         if (p.slot === this.oni || p.st !== ST.FREE) return;
-        if (p.x < 0.0) {
+        if (p.floor===1 && arenaFloor(this,1).inter.some(i=>i.kind==='exit'&&Math.hypot(p.x-i.x,p.z-i.z)<1.25)) {
           p.st = ST.SAFE;
           this._finish("nige", p.slot);
         }
@@ -384,7 +371,7 @@ export class Versus {
   _sendState() {
     const ps = [];
     this.players.forEach((p) => {
-      ps.push([p.slot, +p.x.toFixed(2), +p.z.toFixed(2), +p.yaw.toFixed(2), p.light ? 1 : 0, p.st, p.lives, +(p.held || 0).toFixed(1), +(p.noise || 0).toFixed(2)]);
+      ps.push([p.slot, +p.x.toFixed(2), +p.z.toFixed(2), +p.yaw.toFixed(2), p.light ? 1 : 0, p.st, p.lives, +(p.held || 0).toFixed(1), +(p.noise || 0).toFixed(2),p.floor]);
     });
     this.net.broadcast({
       t: "s", tm: Math.max(0, Math.round(this.timeLeft)),
@@ -406,7 +393,9 @@ export class Versus {
     if (o.t === "p" && this.isHost) {
       const p = this.players.get(from);
       if (!p) return;
-      p.x = o.x; p.z = o.z; p.yaw = o.yaw;
+      if(!Number.isFinite(o.x)||!Number.isFinite(o.z)||!Number.isFinite(o.yaw)||!Number.isInteger(o.fl)||o.fl<1||o.fl>5)return;
+      if(o.fl!==p.floor && (p.st!==ST.FREE||Math.abs(o.fl-p.floor)!==1))return;
+      p.floor=o.fl; p.x = o.x; p.z = o.z; p.yaw = o.yaw;
       p.light = Boolean(o.li);
       p.noise = o.n || 0;
       return;
@@ -414,7 +403,7 @@ export class Versus {
 
     if (o.t === "init" && !this.isHost) {
       this.oni = o.oni;
-      this.keys = (o.keys || []).map((k) => ({ x: k.x, z: k.z, by: null, mesh: null }));
+      this.keys = (o.keys || []).map((k) => ({ x: k.x, z: k.z, floor:k.floor||1, by: null, mesh: null }));
       return;
     }
 
@@ -424,7 +413,7 @@ export class Versus {
         const p = this.players.get(a[0]);
         if (!p) return;
         if (a[0] === this.me) { p.st = a[5]; p.lives = a[6]; p.held = a[7]; return; }
-        p.x = a[1]; p.z = a[2]; p.yaw = a[3];
+        p.floor=a[9]||1; p.x = a[1]; p.z = a[2]; p.yaw = a[3];
         p.light = Boolean(a[4]); p.st = a[5]; p.lives = a[6]; p.held = a[7]; p.noise = a[8] || 0;
       });
       (o.ks || []).forEach((v, i) => { if (this.keys[i]) this.keys[i].by = v ? "?" : null; });
@@ -496,7 +485,7 @@ export class Versus {
     const me = this.players.get(this.me);
     const t = Math.max(0, Math.round(this.timeLeft));
     const got = this.keys.filter((k) => k.by).length;
-    let s = (t / 60 | 0) + ":" + String(t % 60).padStart(2, "0");
+    let s = (me?.floor||1)+'F　'+(t / 60 | 0) + ":" + String(t % 60).padStart(2, "0");
     if (this.amOni) {
       let left = 0;
       this.players.forEach((p) => { if (p.slot !== this.oni && p.st !== ST.OUT && p.st !== ST.SAFE) left++; });
@@ -507,6 +496,6 @@ export class Versus {
       if (me) s += "　あと" + Math.max(0, me.lives) + "回";
     }
     g.ui.setVersus(s, this.amOni);
-    this.hint=this.amOni?vsText('住人に近づくと自動で捕獲（ボタン不要）','Approach a resident to catch them automatically.','Acércate a un residente para atraparlo automáticamente.'):me?.st===ST.HELD?vsText('捕獲中：仲間の救助を待ってください','Caught: wait for a teammate to rescue you.','Atrapado: espera a que te rescaten.'):vsText('鍵を3本集めて階段へ。捕まった仲間はそばで救助。','Collect 3 keys. Stand near caught teammates to rescue them.','Reúne 3 llaves. Acércate a tus compañeros atrapados para rescatarlos.');
+    this.hint=this.amOni?vsText('住人に近づくと自動で捕獲（ボタン不要）','Approach a resident to catch them automatically.','Acércate a un residente para atraparlo automáticamente.'):me?.st===ST.HELD?vsText('捕獲中：仲間の救助を待ってください','Caught: wait for a teammate to rescue you.','Atrapado: espera a que te rescaten.'):vsText('鍵は2・3・5階。3本集めて1階の出口へ。','Keys: 2F, 3F, 5F. Collect all three, then escape via 1F.','Llaves: pisos 2, 3 y 5. Reúne las tres y escapa por el primer piso.');
   }
 }

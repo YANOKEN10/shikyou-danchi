@@ -1,3 +1,4 @@
+import {vsText} from './versus-presentation.js';
 import { showTitleScreen } from './title-screen.js';
 import { initLocale, tr } from "./i18n.js";
 import { showOnboarding } from "./onboarding.js";
@@ -301,6 +302,7 @@ function openLobby() {
   // 初期画面より手前にロビーを出し、開始後も初期画面がゲームを覆わないようにする。
   $("gate").classList.remove("show");
   $("lobby").classList.add("show");
+  $("wholeBuildingInfo").textContent=vsText('1〜5階を自由に移動。2・3・5階の鍵を集め、1階の出口へ。制限時間10分。','Explore floors 1–5. Collect keys on 2F, 3F and 5F, then escape via 1F. Time limit: 10 minutes.','Recorre los pisos 1–5. Reúne llaves en 2, 3 y 5 y escapa por el primer piso. Límite: 10 minutos.');
   $("lobbyMake").style.display = "";
   $("lobbyWait").style.display = "none";
   lobbyMsg("");
@@ -310,15 +312,6 @@ function openLobby() {
 function closeLobby() {
   $("lobby").classList.remove("show");
 }
-
-document.querySelectorAll("#floorPick .f").forEach((el) => {
-  el.onclick = () => {
-    document.querySelectorAll("#floorPick .f").forEach((x) => x.classList.remove("on"));
-    el.classList.add("on");
-    lobbyFloor = Number(el.dataset.f) || 1;
-    snd.ui();
-  };
-});
 
 $("mkRoom").onclick = async () => {
   lobbyMsg("部屋をつくっています…");
@@ -331,7 +324,7 @@ $("mkRoom").onclick = async () => {
   $("lobbyMake").style.display = "none";
   $("lobbyWait").style.display = "";
   $("lobbyCode").textContent = r.code;
-  $("lobbyFloor").textContent = (FLOORS[lobbyFloor - 1] || {}).title + "で遊びます";
+  $("lobbyFloor").textContent = vsText("死鏡団地 全館（1〜5階）", "Whole building (1–5F)", "Todo el edificio (pisos 1–5)");
   lobbyMsg("");
   drawRoster();
 };
@@ -350,7 +343,7 @@ $("joinRoom").onclick = async () => {
   $("lobbyMake").style.display = "none";
   $("lobbyWait").style.display = "";
   $("lobbyCode").textContent = code;
-  $("lobbyFloor").textContent = (FLOORS[lobbyFloor - 1] || {}).title + "で遊びます";
+  $("lobbyFloor").textContent = vsText("死鏡団地 全館（1〜5階）", "Whole building (1–5F)", "Todo el edificio (pisos 1–5)");
   $("lobbyHint").textContent = "つながりました。部屋の主が始めるのを待ちましょう。";
   lobbyMsg("");
   drawRoster();
@@ -374,7 +367,7 @@ $("startGame").onclick = async () => {
   net.broadcast({
     t: "go", oni: oni, floor: lobbyFloor,
     members: { ...net.members },
-    keys: versus.keys.map((k) => ({ x: k.x, z: k.z })),
+    keys: versus.keys.map((k) => ({ x: k.x, z: k.z, floor:k.floor })),
   });
 };
 
