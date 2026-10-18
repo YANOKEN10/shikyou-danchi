@@ -17,3 +17,5 @@
 @keyframes title-breathe{0%,100%{opacity:.65}50%{opacity:1}}
 @media(max-height:500px){#titleEnter{padding:20px 20px 55px}.title-location{margin-bottom:8px;font-size:10px}.title-wordmark{font-size:clamp(40px,9vh,65px)}.title-reading{margin-top:5px;font-size:8px}.title-tagline{margin-top:12px;font-size:12px}.title-action{bottom:32px;padding:5px 18px;font-size:12px}.title-footnote{bottom:8px;font-size:7px}#titleScreen:is([data-language='en'],[data-language='es']) .title-wordmark{font-size:clamp(26px,7vw,62px)}}
 @media(prefers-reduced-motion:reduce){#titleScreen{transition:none}.title-mist,.title-action{animation:none}}
+
+.title-info-link{position:absolute;z-index:3;bottom:max(52px,calc(env(safe-area-inset-bottom) + 30px));left:50%;transform:translateX(-50%);padding:9px 14px;color:#c1bbad;font:12px/1.5 var(--gothic);text-underline-offset:4px;white-space:nowrap}.title-info-link:focus-visible{outline:1px solid #d7c69c}@media(max-height:500px){.title-info-link{top:12px;bottom:auto;left:auto;right:12px;transform:none;font-size:11px}}

@@ -18,6 +18,8 @@ export function showTitleScreen() {
     button.setAttribute('aria-label', copy[4]);
     screen.setAttribute('aria-label', copy[1]);
   }
+  const infoLink=screen.querySelector('.title-info-link');
+  if(infoLink)infoLink.textContent=({en:'About the game · How to play',es:'Sobre el juego · Cómo jugar'})[language]||'ゲーム紹介・遊び方';
   screen.dataset.language = language;
   button.focus({ preventScroll: true });
   return new Promise(resolve => {
