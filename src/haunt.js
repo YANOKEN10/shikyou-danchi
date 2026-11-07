@@ -106,6 +106,7 @@ export class Haunts {
       }
     }
 
+    if(g.dread && !g.dread.pacing.canScare)return;
     this.t -= dt;
     if (this.t > 0) return;
     this.t = rnd(55, 95);

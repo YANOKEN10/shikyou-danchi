@@ -1,3 +1,4 @@
+import {recordRoom} from './exploration-journal.js';
 import { MirrorFigures } from './mirror-figures.js';
 // ============================================================
 //  ゲーム本体
@@ -418,7 +419,7 @@ export class Game {
       }
     }
 
-    if(!this.versus?.on){this._roomFx(dt);this.haunt.update(dt);}
+    if(!this.versus?.on){this._roomFx(dt);}
 
     // 懐中電灯
     const on = p.lightOn && p.hasLight && p.battery > 0;
@@ -474,6 +475,7 @@ export class Game {
     if (this.stalkers.active) out = this.stalkers.update(dt, p, f.col, this.snd);
     this.appar.update(dt, p);
     this.dread.update(dt, out);
+    this.haunt.update(dt);
 
     if (out.spotted && !this._spotFlag) {
       this._spotFlag = true;
@@ -529,7 +531,7 @@ export class Game {
   // 扉を開けたとき
   // 演出用と追跡用が同時に見えると二体に見えるため、安全な時だけ本体と入れ替えて出す。
   _showApparition(x, z, sec, opt) {
-    if (this.appar.mesh.visible) return false;
+    if (this.appar.mesh.visible || !this.dread.pacing.canScare) return false;
     let unsafe = false;
     this.stalkers.list.forEach((s) => {
       const dist = Math.hypot(s.x - this.player.pos.x, s.z - this.player.pos.z);
@@ -570,6 +572,7 @@ export class Game {
 
   // 部屋に入った／出た
   _roomEnter(d) {
+    recordRoom(this);
     this.snd.roomToneOn();
     const room = d.room || {};
     if (room.scare === "water") {
@@ -964,6 +967,7 @@ export class Game {
       if (it.prop) it.prop.visible = false;
       if (this.state.memos.indexOf(it.id) < 0) this.state.memos.push(it.id);
       if (it.id === "m5") this.state.flags.loopBroken = true;
+      recordRoom(this,"memo",it.id);
       this.ui.showMemo(it.id);
       // 読んでいる最中にだけ鉛筆音を重ね、文章を書いた存在がまだ近くにいる印象を残す。
       if (this.state.floor >= 2 && Math.random() < 0.34) {
@@ -996,6 +1000,7 @@ export class Game {
       }
       this.state.spare = p.spare;
       this.snd.pickup();
+      recordRoom(this,"item",it.id);
       this.ui.showItem(it.id, p.spare);
       // 説明文だけでは取得できたか分かりにくいため、品名と完了を最初にはっきり表示する。
       this.ui.sayNow((info ? info.name : "品物") + "を取りました。");
@@ -1222,6 +1227,8 @@ export class Game {
     this.player.unlock();
     this.ui.showBook({
       items: this.state.items, spare: this.player.spare, memos: this.state.memos,
+      survey:this.versus?.on?null:(this.state.flags.survey||{}), floor:this.state.floor, room:this.curRoom?.no,
+      rooms:this.floor.doors.filter(d=>d.canEnter).map(d=>d.no),goal:S.currentGoal(this.state).now,
     }, this.touch);
   }
 

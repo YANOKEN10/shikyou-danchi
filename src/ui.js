@@ -1,3 +1,4 @@
+import {renderJournal} from './exploration-journal.js';
 // ============================================================
 //  画面まわり
 //   ・字幕、調べる案内、メモの全画面表示、持ち物、ポーズ、終幕
@@ -200,6 +201,7 @@ export class UI {
       b.appendChild(h);
     };
 
+    renderJournal(b,state);
     sec("持ち物");
     const inv = document.createElement("div");
     inv.className = "invlist";

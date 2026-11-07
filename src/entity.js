@@ -110,12 +110,18 @@ export class Stalker {
       } else return;
     }
 
+    // Remember only positions that sight or sound actually reveal.
+    const los=col.clear(this.x,this.z,player.pos.x,player.pos.z);
+    const visible=!safe && los && dist<cfg.sight;
+    const heard=player.noise*Math.max(0,1-dist/cfg.hear)*(los?1:.18)*(safe?.6:1);
+    const audible=heard>.075;
+    if(visible||audible)this.lastKnown=player.pos.x;
     /* --- 気づき --- */
     let gain = 0;
     if (!safe) {
-      const los = col.clear(this.x, this.z, player.pos.x, player.pos.z);
+
       // 音
-      const heard = player.noise * Math.max(0, 1 - dist / cfg.hear);
+
       gain += heard * 1.6;
       // 光
       if (player.lightOn) {
@@ -127,16 +133,18 @@ export class Stalker {
       if (los && dist < cfg.sight) gain += (1 - dist / cfg.sight) * 0.55;
     }
 
+    if(safe && audible)gain=heard*.9;
     if (gain > 0) this.awareness = Math.min(1, this.awareness + gain * dt);
     else this.awareness = Math.max(0, this.awareness - dt * 0.42);
 
+    if(safe)this.awareness=Math.min(.85,this.awareness);
     if (this.awareness >= 1 && this.state !== "hunt") {
       this.state = "hunt";
       this.timer = 0;
       if (out) out.spotted = true;
     } else if (this.awareness > 0.35 && this.state === "patrol") {
       this.state = "listen";
-      this.lastKnown = player.pos.x;
+      this.searchT=cfg.patience+Math.min(8,Math.abs(this.lastKnown-this.x)/cfg.speed);
       this.timer = 0;
     }
 
@@ -167,6 +175,7 @@ export class Stalker {
       if (this.timer < -3.5) { this.timer = 1.4 + Math.random() * 2.6; }
       if (this.timer > 0) speed = 0;
     } else if (this.state === "listen") {
+      this.searchT=Math.max(0,(this.searchT||0)-dt);
       speed = cfg.speed * 0.8;
       goal = this.lastKnown;
       if (Math.abs(this.x - goal) < 0.6) {
@@ -174,15 +183,15 @@ export class Stalker {
         speed = 0;
         if (this.timer > cfg.patience) { this.state = "patrol"; this.timer = 0; this.awareness = 0; }
       }
-      if (this.awareness < 0.15) { this.state = "patrol"; this.timer = 0; }
+      if (this.awareness < 0.15 && this.searchT<=0) { this.state = "patrol"; this.timer = 0; }
     } else if (this.state === "hunt") {
       speed = this.stunned > 0 ? 0 : cfg.speed * 1.3 * (this.rage > 0 ? 1.45 : 1);
-      if (safe) {
+      if (safe || (!visible && !audible)) {
         // 見失った
         this.timer += dt;
         goal = this.lastKnown;
         if (this.timer > cfg.patience) {
-          this.state = "listen"; this.timer = 0; this.awareness = 0.4;
+          this.state = "listen"; this.timer = 0; this.awareness = 0.4; this.searchT=cfg.patience+Math.min(8,Math.abs(this.lastKnown-this.x)/cfg.speed);
         }
       } else {
         this.timer = 0;
@@ -246,7 +255,7 @@ export class Stalker {
 
     /* --- つかまえる --- */
     // 廊下の幅は 2.55m。ここを広くすると、壁ぎわを抜けられなくなる
-    if (!safe && dist < 0.6 && this.state === "hunt") {
+    if (!safe && los && dist < 0.6 && this.state === "hunt") {
       // 最初の一度だけは捕獲寸前で消える可能性を持たせ、接近＝即終了という予測を崩す。
       if (!this.nearMissUsed && Math.random() < 0.42) {
         this.nearMissUsed = true; this.state = "gone"; this.goneT = 4.5;

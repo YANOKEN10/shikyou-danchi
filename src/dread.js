@@ -1,3 +1,4 @@
+import {HorrorPacing} from './horror-pacing.js';
 // ============================================================
 // 「それ」の恐怖演出
 //  ・追跡を強くするのではなく、位置と規則を信用できなくする
@@ -9,6 +10,7 @@ const pick = (a) => a[Math.floor(Math.random() * a.length)];
 export class DreadDirector {
   constructor(game) {
     this.g = game;
+    this.pacing=new HorrorPacing();
     this.live = null;
     this.last = "";
     this.seen = new Set();
@@ -17,6 +19,7 @@ export class DreadDirector {
   }
 
   reset() {
+    this.pacing.reset();
     this.live = null;
     this.last = "";
     this.seen.clear();
@@ -28,7 +31,9 @@ export class DreadDirector {
   update(dt, chaseOut) {
     const g = this.g;
     if (!g.floor || g.state.flags.chase || (g.versus && g.versus.on)) return;
-    this._blinkStep(dt);
+    this.pacing.update(dt,chaseOut);
+    if(chaseOut?.hunting){if(this.live?.end)this.live.end(this.live);this.live=null;this.timer=Math.max(this.timer,35);return;}
+    if(this.pacing.canScare)this._blinkStep(dt);
 
     if (chaseOut && chaseOut.nearMiss) this.nearMiss();
     if (this.live) {
@@ -42,6 +47,7 @@ export class DreadDirector {
       return;
     }
 
+    if(!this.pacing.canScare)return;
     this.timer -= dt;
     if (this.timer > 0 || g.state.floor < 2) return;
     const all = ["mirror", "ambush", "peek", "crawl", "double", "mimic", "light", "audio"];
@@ -53,7 +59,7 @@ export class DreadDirector {
   // 自動試験から名指しで起こせるようにし、各演出を運任せにせず検証できるようにする。
   trigger(kind) {
     const fn = this["_" + kind];
-    if (typeof fn !== "function" || !this._can(kind)) return false;
+    if (!this.pacing.canScare || typeof fn !== "function" || !this._can(kind)) return false;
     if (this.live && this.live.end) this.live.end(this.live);
     this.live = null;
     this.last = kind;
