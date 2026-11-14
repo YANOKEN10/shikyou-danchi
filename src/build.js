@@ -1,3 +1,4 @@
+import {ceramic,pillow,bedCover,tubShell} from './furnishing-detail.js';
 import {wornWood,plasticGrain,bevelGeometry} from './material-detail.js';
 import { cc0Head } from './cc0-human.js';
 import { roomStyle, styleWalls, sofa, styledTable, deskChair } from './interior-style.js';
@@ -432,7 +433,7 @@ function commonWetArea(C) {
   makeFront(back, split, "風呂");
 
   // Continuous ceramic shell curves over the rim and down inside the bowl.
-  const toilet=new THREE.Group();toilet.name='toilet';toilet.position.set(left+.58,.065,z0-.88);C.g.add(toilet);
+  const toilet=new THREE.Group();toilet.name='toilet';toilet.position.set(left+.58,.065,z0-.88);toilet.rotation.y=-Math.PI/2;C.g.add(toilet);
   const shellProfile=[[.15,0],[.18,.025],[.165,.16],[.20,.255],[.245,.32],[.248,.36],[.225,.377],
     [.198,.36],[.175,.32],[.13,.22],[.07,.16],[0,.15]].map(([r,y])=>new THREE.Vector2(r,y));
   const bowl=new THREE.Mesh(new THREE.LatheGeometry(shellProfile,64),mats.porcelain);bowl.scale.z=1.35;bowl.name='bowl';toilet.add(bowl);
@@ -446,7 +447,7 @@ function commonWetArea(C) {
   const hinge=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.30,16),mats.porcelain);hinge.rotation.z=Math.PI/2;hinge.position.set(0,.408,.21);toilet.add(hinge);
   const lever=new THREE.Mesh(new THREE.BoxGeometry(.07,.022,.028),mats.kitchenSteel);lever.position.set(.217,.54,.30);toilet.add(lever);
   const supply=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.24,12),mats.kitchenSteel);supply.position.set(.20,.15,.30);toilet.add(supply);
-  C.blk(left + 0.28, z0 - 1.22, left + 0.88, z0 - 0.4);
+  C.blk(left + .14, z0 - 1.17, left + 1.02, z0 - .59);
 
   // 狭いトイレほど鏡の中の奥行きが不自然に見えるため、便器の横に縦長の鏡を置く。
   addWetMirror(C, left + 0.035, 1.38, z0 - 0.94, Math.PI / 2, 0.52, 0.78, "トイレの鏡を覗く");
@@ -455,22 +456,8 @@ function commonWetArea(C) {
   toiletStain.position.set(left + 0.6, 0.068, z0 - 0.92);
   C.g.add(toiletStain);
 
-  // 浴槽は縁と底を別にして、実際に中へ踏み込める洗い場を手前へ確保する。
-  const tubZ = z0 - 3.02;
-  const tubW = 0.9, tubD = 0.94, tubX = left + 0.55;
-  // 浴槽が戸口まで張り出すとプレイヤー半径を含めた通路が消えるため、小型の深い浴槽を左奥へ寄せる。
-  C.pb(tubW, 0.5, 0.08, mats.porcelain, tubX, 0.25, tubZ - tubD / 2);
-  C.pb(tubW, 0.5, 0.08, mats.porcelain, tubX, 0.25, tubZ + tubD / 2);
-  C.pb(0.08, 0.5, tubD, mats.porcelain, tubX - tubW / 2, 0.25, tubZ);
-  C.pb(0.08, 0.5, tubD, mats.porcelain, tubX + tubW / 2, 0.25, tubZ);
-  C.pb(tubW, 0.12, tubD, mats.porcelain, tubX, 0.06, tubZ);
-  // A continuous rounded lip joins all four walls without open corner seams.
-  const rounded=(path,w,h,r)=>{const x=-w/2,y=-h/2;path.moveTo(x+r,y);path.lineTo(x+w-r,y);path.quadraticCurveTo(x+w,y,x+w,y+r);path.lineTo(x+w,y+h-r);path.quadraticCurveTo(x+w,y+h,x+w-r,y+h);path.lineTo(x+r,y+h);path.quadraticCurveTo(x,y+h,x,y+h-r);path.lineTo(x,y+r);path.quadraticCurveTo(x,y,x+r,y);};
-  const rimShape=new THREE.Shape();rounded(rimShape,tubW+.09,tubD+.09,.045);
-  const rimHole=new THREE.Path();rounded(rimHole,tubW-.085,tubD-.085,.04);rimShape.holes.push(rimHole);
-  const tubRim=new THREE.Mesh(new THREE.ExtrudeGeometry(rimShape,{depth:.025,bevelEnabled:true,bevelSize:.007,bevelThickness:.007,bevelSegments:3,steps:1,curveSegments:8}),mats.porcelain);
-  const rimUV=tubRim.geometry.attributes.uv;for(let i=0;i<rimUV.count;i++){rimUV.setXY(i,Math.max(0,Math.min(1,rimUV.getX(i)+.5)),Math.max(0,Math.min(1,rimUV.getY(i)+.5)));}rimUV.needsUpdate=true;
-  tubRim.rotation.x=-Math.PI/2;tubRim.position.set(tubX,.487,tubZ);tubRim.name='tub-rim';C.g.add(tubRim);
+  const tubZ=z0-3.02,tubW=.9,tubD=.94,tubX=left+.55;
+  tubShell(C.g,tubX,tubZ,mats.porcelain,mats.kitchenSteel);
   // 右側に約70cmの洗い場を残し、扉から奥まで直線で歩ける当たり判定にする。
   C.blk(tubX - tubW / 2 - 0.04, tubZ - tubD / 2 - 0.04, tubX + tubW / 2 + 0.04, tubZ + tubD / 2 + 0.04);
 
@@ -618,16 +605,11 @@ function furnishHome(C) {
     } else if(kind==='bed') {
       part(w,.2,d,m.darkwood,0,.25,0); part(w-.08,.18,d-.1,m.cushion,0,.44,0);
       part(w,.85,.08,m.wood,0,.48,-d/2+.04);
-      const pillow = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12), m.pillow);
-      pillow.scale.set((w-.24)/2,.085,.21);put(g,pillow,0,.59,-d/2+.35);
+      pillow(g,w-.24,0,.59,-d/2+.35);
       for (const xx of [-w/2+.05,w/2-.05]) part(.07,.16,d,m.wood,xx,.36,0);
       for (const xx of [-w/2+.07,w/2-.07]) part(.10,1,.10,m.darkwood,xx,.5,-d/2+.04);
       part(w-.14,.07,.035,m.darkwood,0,.83,-d/2+.09);
-      const quilt = new THREE.Mesh(new THREE.BoxGeometry(w-.06,.075,d*.60,18,2,20),m.futon2);
-      const qp=quilt.geometry.attributes.position;
-      for(let i=0;i<qp.count;i++) {const x=qp.getX(i),z=qp.getZ(i);qp.setY(i,qp.getY(i)+.018*Math.sin(z*30+x*8)+.012*Math.cos(x*24));}
-      quilt.geometry.computeVertexNormals();put(g,quilt,0,.57,d*.15);
-      part(w-.06,.055,.16,m.futon2,0,.61,-d*.11);
+      bedCover(g,w,d);
       for(const xx of [-w/2+.08,w/2-.08])for(const zz of [-d/2+.1,d/2-.1])part(.09,.3,.09,m.darkwood,xx,.15,zz);
     } else if(kind==='dresser') {
       C.g.remove(g);buildDresser(C,w,1.30,d,x,z);
@@ -852,7 +834,7 @@ const FURNISH = {
   child(C) {
     const { mats, dx, x0, x1, z1, zMid, H } = C;
     // 学習机と椅子
-    C.pb(1.15, 0.72, 0.6, mats.wood, x0 + 0.9, 0.36, z1 + 0.45);
+    cabinet(C,1.15,.72,.6,x0+.9,z1+.45);
     C.pb(1.15, 0.5, 0.28, mats.wood, x0 + 0.9, 1.15, z1 + 0.2);
     C.blk(x0 + 0.3, z1, x0 + 1.5, z1 + 0.8);
     C.pb(0.42, 0.06, 0.42, mats.wood, x0 + 0.9, 0.42, z1 + 1.0);
@@ -1037,10 +1019,13 @@ const FURNISH = {
   // 管理人の詰所
   office(C) {
     const { mats, dx, x0, x1, z1, zMid, H } = C;
-    C.pb(1.9, 1.85, 0.4, mats.appliance, x0 + 1.1, 0.93, z1 + 0.25);
+    cabinet(C,1.9,1.85,.4,x0+1.1,z1+.25);
     C.blk(x0 + 0.15, z1, x0 + 2.05, z1 + 0.5);
     // スチール机と椅子
-    C.pb(1.3, 0.72, 0.65, mats.appliance, x1 - 0.9, 0.36, z1 + 1.1);
+    const deskX=x1-.9,deskZ=z1+1.1;
+    C.pb(1.3,.055,.65,mats.appliance,deskX,.72,deskZ);
+    for(const xx of [-.56,.56])for(const zz of [-.24,.24])C.pb(.045,.69,.045,mats.darksteel,deskX+xx,.35,deskZ+zz);
+    cabinet(C,.38,.50,.57,deskX+.39,deskZ,.18);
     C.blk(x1 - 1.6, z1 + 0.75, x1 - 0.2, z1 + 1.45);
     C.pb(0.42, 0.06, 0.42, mats.wood, x1 - 0.9, 0.45, z1 + 1.75);
     C.pb(0.05, 0.42, 0.05, mats.wood, x1 - 1.05, 0.22, z1 + 1.75);
@@ -1054,7 +1039,7 @@ const FURNISH = {
   // テレビがついている
   tv(C) {
     const { mats, dx, x0, x1, z1, zMid } = C;
-    C.pb(0.9, 0.5, 0.42, mats.wood, dx, 0.25, z1 + 0.5);
+    cabinet(C,.9,.5,.42,dx,z1+.5);
     const body = C.pb(0.82, 0.68, 0.62, mats.appliance, dx, 0.84, z1 + 0.5);
     C.blk(dx - 0.5, z1 + 0.15, dx + 0.5, z1 + 0.85);
     const screen = C.wall(0.62, 0.48, mats.tvScreen, dx, 0.88, z1 + 0.82);
@@ -1371,7 +1356,7 @@ export function buildFloor(scene, floorDef, opt) {
     stain: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false }),
     stainDark: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }),
     bag: new THREE.MeshStandardMaterial({ color: 0x151a19, roughness: .48, metalness: 0, bumpMap:plasticGrain(), bumpScale:.0015 }),
-    porcelain: new THREE.MeshStandardMaterial({ map: bathTexture(), color: 0xf1eee6, roughness:.3 }),
+    porcelain: ceramic(bathTexture()),
     kitchenSteel: lam({ map: interiorTexture(0, 1), color: 0xb2b0aa }),
     mirror: new THREE.MeshBasicMaterial({ map: TX.mirrorGlass(), color: 0xa5b6bd }),
     mirrorSmear: new THREE.MeshBasicMaterial({ map: TX.mirrorSmear(), transparent: true, depthWrite: false }),

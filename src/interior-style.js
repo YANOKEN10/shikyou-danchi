@@ -1,3 +1,4 @@
+import {softMaterial,seam} from './furnishing-detail.js';
 import {agedPaint} from './material-detail.js';
 import * as THREE from '../lib/three.module.js';
 const caches=new WeakMap();
@@ -36,16 +37,16 @@ export function roomStyle(mats,room){
  m.style=kind;
  m.cloth=new THREE.MeshLambertMaterial({map:fabricTexture('plaid'),side:THREE.DoubleSide});
  m.flowerCloth=new THREE.MeshLambertMaterial({map:fabricTexture('flower'),side:THREE.DoubleSide});
- m.leather=new THREE.MeshStandardMaterial({color:0x423b30,roughness:.75});
+ m.leather=softMaterial('leather');
  m.trim=new THREE.MeshLambertMaterial({color:kind==='western'?0xa29e83:0x42372d});
  m.cabinetPaint=new THREE.MeshStandardMaterial({map:agedPaint(),color:0xbac1ac,roughness:.88});
- m.cushionCover=new THREE.MeshLambertMaterial({color:0x414e62});
+ m.cushionCover=softMaterial('pillow');m.cushionCover.color.setHex(0x68756a);
  cache[kind]=m;return m;
 }
 function part(g,w,h,d,mat,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);g.add(m);return m;}
 function soft(g,w,h,d,mat,x,y,z){
- const r=Math.min(w,h,d)*.22,geo=new THREE.BoxGeometry(w,h,d,6,6,6),a=geo.attributes.position;
- for(let i=0;i<a.count;i++){const p=new THREE.Vector3(a.getX(i),a.getY(i),a.getZ(i));const q=new THREE.Vector3(Math.max(-w/2+r,Math.min(w/2-r,p.x)),Math.max(-h/2+r,Math.min(h/2-r,p.y)),Math.max(-d/2+r,Math.min(d/2-r,p.z)));p.sub(q).normalize().multiplyScalar(r).add(q);a.setXYZ(i,p.x,p.y,p.z);}geo.computeVertexNormals();const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m;
+ const r=Math.min(w,h,d)*.22,geo=new THREE.BoxGeometry(w,h,d,14,10,14),a=geo.attributes.position;
+ for(let i=0;i<a.count;i++){const p=new THREE.Vector3(a.getX(i),a.getY(i),a.getZ(i));const q=new THREE.Vector3(Math.max(-w/2+r,Math.min(w/2-r,p.x)),Math.max(-h/2+r,Math.min(h/2-r,p.y)),Math.max(-d/2+r,Math.min(d/2-r,p.z)));p.sub(q).normalize().multiplyScalar(r).add(q);a.setXYZ(i,p.x,p.y,p.z);}if(mat.userData.upholstery){for(let i=0;i<a.count;i++){const x=a.getX(i),y=a.getY(i),z=a.getZ(i);if(h<.25&&y>0)a.setY(i,y-.020*Math.exp(-((x/(w*.35))**2+(z/(d*.35))**2)));if(d<.25&&z>0)a.setZ(i,z-.012*Math.exp(-((x/(w*.35))**2+(y/(h*.35))**2)));}}geo.computeVertexNormals();const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m;
 }
 export function styleWalls(C){
  const {x0,x1,z1,zMid,H,mats:m}=C,depth=zMid-z1;
@@ -59,7 +60,7 @@ export function styleWalls(C){
 export function sofa(g,w,d,m){
  g.name='sofa';part(g,w,.14,d,m.darkwood,0,.20,0);
  for(const x of [-w/2+.1,w/2-.1])for(const z of [-d/2+.1,d/2-.1])part(g,.075,.17,.075,m.darkwood,x,.085,z);
- for(const x of [-w/4+.035,w/4-.035]){soft(g,w/2-.12,.18,d-.17,m.leather,x,.35,.04);const back=soft(g,w/2-.11,.48,.16,m.leather,x,.64,-d/2+.09);back.rotation.x=-.10;}
+ for(const x of [-w/4+.035,w/4-.035]){soft(g,w/2-.12,.18,d-.17,m.leather,x,.35,.04);seam(g,[[x-w/4+.09,.405,-d/2+.16],[x+w/4-.09,.405,-d/2+.16],[x+w/4-.09,.405,d/2-.09],[x-w/4+.09,.405,d/2-.09]],0x4c4337);const back=soft(g,w/2-.11,.48,.16,m.leather,x,.64,-d/2+.09);back.rotation.x=-.10;}
  for(const x of [-w/2+.08,w/2-.08])soft(g,.16,.42,d,m.leather,x,.43,0);
  const cushion=soft(g,.32,.31,.12,m.cushionCover,-w*.23,.59,-d*.12);cushion.rotation.z=.18;
 }

@@ -1,3 +1,4 @@
+import './control-labels.js';
 import {vsText} from './versus-presentation.js';
 import { showTitleScreen } from './title-screen.js';
 import { initLocale, tr } from "./i18n.js";

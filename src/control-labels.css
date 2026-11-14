@@ -1,0 +1,8 @@
+#objective{top:76px;bottom:auto;left:18px;right:auto;max-width:min(480px,calc(100vw - 36px));padding:9px 13px;border-left:2px solid #b8a37a;background:rgba(7,10,12,.86);border-radius:2px;color:#eee6d4;text-align:left;font-size:14px;line-height:1.6;letter-spacing:.025em;text-shadow:0 1px 2px #000;box-shadow:0 3px 16px #0004;overflow-wrap:break-word}
+#objective::before{display:block;font-size:11px;line-height:1.6;color:#c6b797;content:'いまの目的'}
+body.touch #objective{top:76px;bottom:auto;left:18px;right:18px;max-width:480px;font-size:14px}
+.tbtn{padding:0;text-align:center;line-height:1.25;touch-action:manipulation}
+#bAct{font-size:16px}#bCrouch{font-size:12px}#bLight{font-size:13px}#bRun{font-size:14px}#bBook,#bPause{font-size:13px}
+html:lang(en) #objective::before{content:'CURRENT OBJECTIVE'}html:lang(es) #objective::before{content:'OBJETIVO ACTUAL'}
+html:is(:lang(en),:lang(es)) #bAct{font-size:12px}html:is(:lang(en),:lang(es)) #bCrouch{font-size:10px}
+@media(max-height:500px){#objective,body.touch #objective{top:69px;padding:6px 10px;font-size:12px;max-width:min(390px,calc(100vw - 36px))}#objective::before{font-size:10px}}

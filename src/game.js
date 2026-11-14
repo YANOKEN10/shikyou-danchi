@@ -424,7 +424,7 @@ export class Game {
     // 懐中電灯
     const on = p.lightOn && p.hasLight && p.battery > 0;
     const weak = p.battery < 0.2 ? (0.55 + Math.sin(performance.now() * 0.02) * 0.15 * (0.2 - p.battery) * 5) : 1;
-    this.torch.intensity += ((on ? 46 * weak : 0) - this.torch.intensity) * Math.min(1, dt * 12);
+    this.torch.intensity += ((on ? 26 * weak : 0) - this.torch.intensity) * Math.min(1, dt * 12);
     this.torch.position.copy(this.camera.position);
     // 「それ」を照らす光。見ている方向から、ほぼ一定の弱さで当てる
     this.entityLight.position.copy(this.camera.position);

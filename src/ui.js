@@ -1,3 +1,4 @@
+import {controls} from './control-labels.js';
 import {renderJournal} from './exploration-journal.js';
 // ============================================================
 //  画面まわり
@@ -245,7 +246,8 @@ export class UI {
       const r = document.createElement("div");
       r.className = "helprow";
       r.innerHTML = "<kbd></kbd><span></span>";
-      r.querySelector("kbd").textContent = k;
+      const ids={"調":"bAct","走":"bRun","屈":"bCrouch","灯":"bLight","帳":"bBook"};
+      r.querySelector("kbd").textContent = (controls[language]||controls.ja)[ids[k]] || k;
       r.querySelector("span").textContent = v;
       help.appendChild(r);
     });
