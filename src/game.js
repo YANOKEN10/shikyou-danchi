@@ -126,7 +126,7 @@ export class Game {
     this.scene.add(this.roomVisibility);
 
     // 懐中電灯
-    this.torch = new THREE.SpotLight(0xffeec8, 0, 26, 0.44, 0.5, 1.5);
+    this.torch = new THREE.SpotLight(0xffeec8, 0, 26, 0.53, 0.94, 1.5);
     this.torch.position.set(0, 0, 0);
     this.torchTarget = new THREE.Object3D();
     this.scene.add(this.torch);
@@ -683,7 +683,7 @@ export class Game {
       if (f.kind === "mirror") {
         if (!this.mirrorFigures) this.mirrorFigures = new MirrorFigures(this.renderer, B.buildEntity());
         if (this._mirrorFrame == null || this.state.seconds - this._mirrorFrame > .12) { this.mirrorFigures.render(this.state.seconds); this._mirrorFrame = this.state.seconds; }
-        this.mirrorFigures.apply(f, this.player);
+        this.mirrorFigures.apply(f, this.player, this.scene, this.camera);
         // 見ているあいだに、うしろへ何かが立つ
         if (f.ph != null && f.ph > 0) {
           f.ph += dt / 1.6;

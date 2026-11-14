@@ -1,3 +1,4 @@
+import {wornWood,plasticGrain,bevelGeometry} from './material-detail.js';
 import { cc0Head } from './cc0-human.js';
 import { roomStyle, styleWalls, sofa, styledTable, deskChair } from './interior-style.js';
 // ============================================================
@@ -351,10 +352,10 @@ function commonRoom(C) {
   shade.rotation.x = Math.PI / 2;
   shade.position.set(dx, H - 0.105, shadeZ);
   C.g.add(shade);
-  const cord = box(0.012, 0.62, 0.012, mats.cord);
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(.003,.003,.62,6),mats.cord);
   cord.position.set(dx + 0.16, H - 0.5, shadeZ);
   C.g.add(cord);
-  const knob = box(0.035, 0.07, 0.035, mats.cord);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(.009,12,8),new THREE.MeshBasicMaterial({color:0x584e3e}));knob.scale.y=1.35;
   knob.position.set(dx + 0.16, H - 0.84, shadeZ);
   C.g.add(knob);
   C.fx.push({ kind: "cord", mesh: cord, knob, x: dx, z: shadeZ, base: H - 0.5, sway: 0 });
@@ -644,18 +645,19 @@ function furnishHome(C) {
 }
 function buildDresser(C,w,h,d,x,z) {
   const g=new THREE.Group();g.position.set(x,0,z);g.userData.furniture='dresser';g.userData.roomNo=C.unit.no;C.g.add(g);
-  const wood=dresserAtlas.clone();wood.repeat.set(.48,.98);wood.offset.set(.52,.01);
-  const side=new THREE.MeshStandardMaterial({map:wood,roughness:.72,color:0xe0cebb});
+  const wood=wornWood();
+  const side=new THREE.MeshStandardMaterial({map:wood,roughness:.86,color:0xe0cebb});
   const body=box(w,h-.05,d,side);body.position.y=h/2;g.add(body);
+  put(g,box(w-.055,h-.1,.01,C.mats.darkwood),0,h/2,d/2+.002);
   const cap=box(w+.04,.055,d+.035,side);cap.position.y=h+.015;g.add(cap);
   for(let i=0;i<4;i++){
-    const map=dresserAtlas.clone();map.repeat.set(.494,.23);map.offset.set(.006,.016+i*.245);
-    const faceMat=new THREE.MeshStandardMaterial({map,roughness:.65,color:0xf0e6d8});
-    const drawer=box(w-.06,(h-.12)/4-.012,.045,[side,side,side,side,faceMat,side]);
-    drawer.position.set(0,.07+(i+.5)*(h-.12)/4,d/2+.014);g.add(drawer);
+    const map=wood;
+    const faceMat=new THREE.MeshStandardMaterial({map,roughness:.82,color:0xe8d3b5});
+    const drawer=new THREE.Mesh(bevelGeometry(w-.07,(h-.12)/4-.025,.055),faceMat);
+    drawer.position.set(0,.07+(i+.5)*(h-.12)/4,d/2+.037);g.add(drawer);
     for(const xx of [-w*.23,w*.23]) {
       for(const off of [-.055,.055])put(g,box(.022,.035,.035,C.mats.darksteel),xx+off,drawer.position.y,d/2+.052);
-      put(g,box(.14,.021,.025,C.mats.steel),xx,drawer.position.y-.013,d/2+.074);
+      const handle=new THREE.Mesh(new THREE.TorusGeometry(.055,.009,8,20,Math.PI),new THREE.MeshStandardMaterial({color:0x8b7445,metalness:.55,roughness:.55}));handle.rotation.z=Math.PI;put(g,handle,xx,drawer.position.y,d/2+.075);
     }
   }
   put(g,box(w+.02,.07,d+.02,side),0,.045,0);
@@ -691,8 +693,9 @@ function garbageBag(C,r,x,z,seed,y=.035) {
   const pos=geo.attributes.position;
   for(let i=0;i<pos.count;i++) {
     const xx=pos.getX(i),zz=pos.getZ(i),yy=pos.getY(i),a=Math.atan2(xx,zz),v=yy/r;
-    const fold=1+.018*Math.sin(a*23+v*13+seed)+.025*Math.sin(a*11-v*7)+.045*Math.cos(a*3+seed);
-    pos.setXYZ(i,xx*fold+Math.sin(seed)*r*.10*v*v,yy,zz*fold*.88);
+    const fold=1+.025*Math.sin(a*23+v*13+seed)+.055*Math.sin(a*11-v*7)+.10*Math.cos(a*3+seed)+.055*Math.sin(a*5+v*4+seed*2);
+    const squeeze=.82+.13*Math.sin(seed*1.7);
+    pos.setXYZ(i,xx*fold+Math.sin(seed)*r*.16*v*v,yy*(.90+.16*Math.cos(seed)),zz*fold*squeeze);
   }
   geo.computeVertexNormals();g.add(new THREE.Mesh(geo,C.mats.bag));
   const knot=new THREE.Mesh(new THREE.TorusGeometry(r*.105,r*.043,8,16),C.mats.bag);knot.rotation.x=Math.PI/2;put(g,knot,0,r*1.30,0);
@@ -1147,6 +1150,7 @@ function lowTable(C, px, pz) { styledTable(C, px, pz); }
 
 // 鏡にうつるもの（ふだんは見えない）
 function addGhost(C, mirror, px, py, pz, ry, w, h) {
+  mirror.userData.mirrorSurface=true;
   const tall = mirror.geometry.parameters.height > 1.2;
   const height = tall ? mirror.geometry.parameters.height * .91 : mirror.geometry.parameters.height * .94;
   const width = tall ? height * (1.4 / 2.2) : height * 1.4;
@@ -1155,10 +1159,10 @@ function addGhost(C, mirror, px, py, pz, ry, w, h) {
   const uv=geometry.attributes.uv, cropY=tall?1:.45, cropX=(geometry.parameters.width/height)/(1.4/2.2)*cropY;
   for(let i=0;i<uv.count;i++){uv.setX(i,.5+(uv.getX(i)-.5)*cropX);if(!tall)uv.setY(i,.55+uv.getY(i)*cropY);}
   const mat = new THREE.MeshBasicMaterial({ transparent:true, opacity:0, depthWrite:false, toneMapped:false });
-  const m = new THREE.Mesh(geometry,mat);
+  const m = new THREE.Mesh(geometry,mat);m.userData.mirrorOverlay=true;
   m.position.copy(mirror.position); m.position.x+=Math.sin(ry)*.012; m.position.z+=Math.cos(ry)*.012;
   m.rotation.y=ry||0; C.g.add(m);
-  const reflection = new THREE.Mesh(geometry.clone(),mat.clone()); reflection.material.opacity=.82;
+  const reflection = new THREE.Mesh(geometry.clone(),mat.clone()); reflection.material.opacity=.82;reflection.userData.mirrorOverlay=true;
   reflection.position.copy(m.position); reflection.rotation.copy(m.rotation); C.g.add(reflection);
   C.fx.push({kind:'mirror',mesh:m,reflection,mirror,x:px,z:pz,t:6+Math.random()*8});
 }
@@ -1366,7 +1370,7 @@ export function buildFloor(scene, floorDef, opt) {
     scribble: lam({ map: TX.scribble(), transparent: true }),
     stain: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false }),
     stainDark: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }),
-    bag: new THREE.MeshStandardMaterial({ color: 0x292d31, roughness: .56, metalness: 0 }),
+    bag: new THREE.MeshStandardMaterial({ color: 0x151a19, roughness: .48, metalness: 0, bumpMap:plasticGrain(), bumpScale:.0015 }),
     porcelain: new THREE.MeshStandardMaterial({ map: bathTexture(), color: 0xf1eee6, roughness:.3 }),
     kitchenSteel: lam({ map: interiorTexture(0, 1), color: 0xb2b0aa }),
     mirror: new THREE.MeshBasicMaterial({ map: TX.mirrorGlass(), color: 0xa5b6bd }),
@@ -1884,6 +1888,7 @@ export function animateEntity(ent, dt, moving) {
 
 export function disposeFloor(scene, floor) {
   if (!floor) return;
+  for(const f of floor.fx||[])f.surface?.target.dispose();
   scene.remove(floor.group);
   floor.group.traverse((o) => {
     if (o.geometry) o.geometry.dispose();

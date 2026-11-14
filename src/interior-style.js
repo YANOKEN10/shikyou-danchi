@@ -1,3 +1,4 @@
+import {agedPaint} from './material-detail.js';
 import * as THREE from '../lib/three.module.js';
 const caches=new WeakMap();
 function fabricTexture(kind){
@@ -37,7 +38,7 @@ export function roomStyle(mats,room){
  m.flowerCloth=new THREE.MeshLambertMaterial({map:fabricTexture('flower'),side:THREE.DoubleSide});
  m.leather=new THREE.MeshStandardMaterial({color:0x423b30,roughness:.75});
  m.trim=new THREE.MeshLambertMaterial({color:kind==='western'?0xa29e83:0x42372d});
- m.cabinetPaint=new THREE.MeshLambertMaterial({color:0x91a99e});
+ m.cabinetPaint=new THREE.MeshStandardMaterial({map:agedPaint(),color:0xbac1ac,roughness:.88});
  m.cushionCover=new THREE.MeshLambertMaterial({color:0x414e62});
  cache[kind]=m;return m;
 }
